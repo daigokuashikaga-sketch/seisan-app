@@ -2,7 +2,7 @@ node_modules/
 .turbo/
 dist/
 .env
-.env.*
-!.env.template
-*.github_token
+.env.local
+.github_token
 .bun/
+*.log
