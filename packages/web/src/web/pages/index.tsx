@@ -155,7 +155,7 @@ function LoginScreen({ onSuccess }: { onSuccess: () => void }) {
               <input
                 type="text" value={name} onChange={e => setName(e.target.value)} required
                 placeholder="山田 太郎"
-                style={{ width:'100%', padding:'10px 14px', border:'1.5px solid #E2E8F0', borderRadius:10, fontSize:14, boxSizing:'border-box', outline:'none' }}
+                style={{ width:'100%', padding:'10px 14px', border:'1.5px solid #E2E8F0', borderRadius:10, fontSize:14, color:'#111827', boxSizing:'border-box', outline:'none' }}
               />
             </div>
           )}
@@ -164,7 +164,7 @@ function LoginScreen({ onSuccess }: { onSuccess: () => void }) {
             <input
               type="email" value={email} onChange={e => setEmail(e.target.value)} required
               placeholder="you@example.com"
-              style={{ width:'100%', padding:'10px 14px', border:'1.5px solid #E2E8F0', borderRadius:10, fontSize:14, boxSizing:'border-box', outline:'none' }}
+              style={{ width:'100%', padding:'10px 14px', border:'1.5px solid #E2E8F0', borderRadius:10, fontSize:14, color:'#111827', boxSizing:'border-box', outline:'none' }}
             />
           </div>
           <div>
@@ -172,7 +172,7 @@ function LoginScreen({ onSuccess }: { onSuccess: () => void }) {
             <input
               type="password" value={password} onChange={e => setPassword(e.target.value)} required
               placeholder="••••••••"
-              style={{ width:'100%', padding:'10px 14px', border:'1.5px solid #E2E8F0', borderRadius:10, fontSize:14, boxSizing:'border-box', outline:'none' }}
+              style={{ width:'100%', padding:'10px 14px', border:'1.5px solid #E2E8F0', borderRadius:10, fontSize:14, color:'#111827', boxSizing:'border-box', outline:'none' }}
             />
           </div>
 
@@ -566,31 +566,31 @@ function FormTab({ currentUser, budget, showToast, onSubmitted }: {
         <div>
           <label style={{ fontSize:13, fontWeight:600, color:'#374151', display:'block', marginBottom:6 }}>件名 *</label>
           <input value={form.title} onChange={e => set('title', e.target.value)} required placeholder="部署BBQ食材費"
-            style={{ width:'100%', padding:'10px 14px', border:'1.5px solid #E2E8F0', borderRadius:10, fontSize:14 }}/>
+            style={{ width:'100%', padding:'10px 14px', border:'1.5px solid #E2E8F0', borderRadius:10, fontSize:14, color:'#111827' }}/>
         </div>
         <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:14 }}>
           <div>
             <label style={{ fontSize:13, fontWeight:600, color:'#374151', display:'block', marginBottom:6 }}>金額 *</label>
             <input value={form.amount} onChange={e => set('amount', e.target.value)} required type="number" min="0" placeholder="3500"
-              style={{ width:'100%', padding:'10px 14px', border:'1.5px solid #E2E8F0', borderRadius:10, fontSize:14 }}/>
+              style={{ width:'100%', padding:'10px 14px', border:'1.5px solid #E2E8F0', borderRadius:10, fontSize:14, color:'#111827' }}/>
           </div>
           <div>
             <label style={{ fontSize:13, fontWeight:600, color:'#374151', display:'block', marginBottom:6 }}>日付 *</label>
             <input value={form.date} onChange={e => set('date', e.target.value)} required type="date"
-              style={{ width:'100%', padding:'10px 14px', border:'1.5px solid #E2E8F0', borderRadius:10, fontSize:14 }}/>
+              style={{ width:'100%', padding:'10px 14px', border:'1.5px solid #E2E8F0', borderRadius:10, fontSize:14, color:'#111827' }}/>
           </div>
         </div>
         <div>
           <label style={{ fontSize:13, fontWeight:600, color:'#374151', display:'block', marginBottom:6 }}>カテゴリ</label>
           <select value={form.category} onChange={e => set('category', e.target.value)}
-            style={{ width:'100%', padding:'10px 14px', border:'1.5px solid #E2E8F0', borderRadius:10, fontSize:14, background:'#fff' }}>
+            style={{ width:'100%', padding:'10px 14px', border:'1.5px solid #E2E8F0', borderRadius:10, fontSize:14, color:'#111827', background:'#fff' }}>
             {CATEGORIES.map(c => <option key={c} value={c}>{CAT_EMOJI[c]} {c}</option>)}
           </select>
         </div>
         <div>
           <label style={{ fontSize:13, fontWeight:600, color:'#374151', display:'block', marginBottom:6 }}>備考</label>
           <textarea value={form.note} onChange={e => set('note', e.target.value)} placeholder="補足事項があれば..." rows={3}
-            style={{ width:'100%', padding:'10px 14px', border:'1.5px solid #E2E8F0', borderRadius:10, fontSize:14, resize:'vertical' }}/>
+            style={{ width:'100%', padding:'10px 14px', border:'1.5px solid #E2E8F0', borderRadius:10, fontSize:14, color:'#111827', resize:'vertical' }}/>
         </div>
         <button type="submit" disabled={submitting} style={{
           padding:'13px', borderRadius:11, border:'none', cursor:'pointer',
@@ -676,7 +676,7 @@ function HistoryTab({
           <option value="rejected">却下</option>
         </select>
         <div style={{ flex:1, minWidth:160, position:'relative' }}>
-          <Search size={15} style={{ position:'absolute', left:10, top:'50%', transform:'translateY(-50%)', color:'#94A3B8' }}/>
+          <Search size={15} style={{ position:'absolute', left:10, top:'50%', transform:'translateY(-50%)', color:'#64748B' }}/>
           <input value={searchQ} onChange={e => setSearchQ(e.target.value)} placeholder="検索..."
             style={{ width:'100%', padding:'7px 12px 7px 32px', border:'1.5px solid #E2E8F0', borderRadius:8, fontSize:13 }}/>
         </div>
@@ -684,9 +684,9 @@ function HistoryTab({
 
       {/* Table */}
       {loading ? (
-        <div style={{ textAlign:'center', padding:60, color:'#94A3B8' }}>読み込み中...</div>
+        <div style={{ textAlign:'center', padding:60, color:'#64748B' }}>読み込み中...</div>
       ) : expenses.length === 0 ? (
-        <div style={{ textAlign:'center', padding:60, color:'#94A3B8' }}>申請がありません</div>
+        <div style={{ textAlign:'center', padding:60, color:'#64748B' }}>申請がありません</div>
       ) : (
         <div style={{ background:'#fff', borderRadius:14, boxShadow:'0 2px 12px rgba(0,0,0,.06)', overflow:'hidden' }}>
           <table style={{ width:'100%', borderCollapse:'collapse' }}>
@@ -707,7 +707,7 @@ function HistoryTab({
                         {e.aiWarning && <AlertTriangle size={14} color="#D97706" style={{ flexShrink:0 }}/>}
                         <span style={{ fontSize:14, fontWeight:500, color:'#1E293B' }}>{e.title}</span>
                       </div>
-                      {e.note && <div style={{ fontSize:12, color:'#94A3B8', marginTop:2 }}>{e.note}</div>}
+                      {e.note && <div style={{ fontSize:12, color:'#374151', marginTop:2 }}>{e.note}</div>}
                     </td>
                     <td style={{ padding:'12px 16px', fontSize:14, fontWeight:600, color:'#1E293B', whiteSpace:'nowrap' }}>
                       ¥{e.amount.toLocaleString()}
@@ -758,7 +758,7 @@ function HistoryTab({
             onClick={e => e.stopPropagation()}>
             <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:20 }}>
               <h3 style={{ fontSize:18, fontWeight:700, color:'#1E293B', margin:0 }}>申請詳細</h3>
-              <button onClick={() => setDetail(null)} style={{ background:'none', border:'none', cursor:'pointer', color:'#94A3B8' }}><X size={20}/></button>
+              <button onClick={() => setDetail(null)} style={{ background:'none', border:'none', cursor:'pointer', color:'#64748B' }}><X size={20}/></button>
             </div>
             {detail.aiWarning && (
               <div style={{ background:'#FEF3C7', border:'1px solid #FDE68A', borderRadius:10, padding:'10px 14px', marginBottom:16, fontSize:13, color:'#92400E', display:'flex', gap:8 }}>
@@ -844,7 +844,7 @@ function DashboardTab({
               <div style={{ width:40, height:40, borderRadius:10, background:c.bg, display:'flex', alignItems:'center', justifyContent:'center', color:c.color }}>{c.icon}</div>
             </div>
             <div style={{ fontSize:24, fontWeight:700, color:'#1E293B' }}>{c.value}</div>
-            <div style={{ fontSize:12, color:'#94A3B8', marginTop:4 }}>{c.sub}</div>
+            <div style={{ fontSize:12, color:'#374151', marginTop:4 }}>{c.sub}</div>
           </div>
         ))}
       </div>
@@ -858,7 +858,7 @@ function DashboardTab({
         <div style={{ height:10, background:'#F1F5F9', borderRadius:5, overflow:'hidden' }}>
           <div style={{ height:'100%', width:`${Math.min(budgetUsed*100, 100)}%`, background: budgetColor, borderRadius:5, transition:'width .8s ease' }}/>
         </div>
-        <div style={{ display:'flex', justifyContent:'space-between', marginTop:8, fontSize:12, color:'#94A3B8' }}>
+        <div style={{ display:'flex', justifyContent:'space-between', marginTop:8, fontSize:12, color:'#374151' }}>
           <span>¥{approvedAmount.toLocaleString()} 使用</span>
           <span>上限 ¥{budget.toLocaleString()}</span>
         </div>
@@ -889,7 +889,7 @@ function DashboardTab({
         {/* Monthly trend */}
         <div style={{ background:'#fff', borderRadius:14, padding:20, boxShadow:'0 2px 10px rgba(0,0,0,.06)' }}>
           <h3 style={{ fontSize:15, fontWeight:700, color:'#1E293B', marginBottom:4 }}>月次推移（過去6ヶ月）</h3>
-          <p style={{ fontSize:12, color:'#94A3B8', marginBottom:16 }}>承認済申請の合計</p>
+          <p style={{ fontSize:12, color:'#374151', marginBottom:16 }}>承認済申請の合計</p>
           {trendData.length === 0 ? (
             <div style={{ textAlign:'center', color:'#94A3B8', padding:20, fontSize:13 }}>データなし</div>
           ) : (
@@ -897,7 +897,7 @@ function DashboardTab({
               <MiniBar data={trendData} color="#6366F1"/>
               <div style={{ display:'flex', justifyContent:'space-between', marginTop:8 }}>
                 {last6.map(k => (
-                  <div key={k} style={{ fontSize:11, color:'#94A3B8' }}>{k.slice(5)}月</div>
+                  <div key={k} style={{ fontSize:11, color:'#64748B' }}>{k.slice(5)}月</div>
                 ))}
               </div>
             </>
@@ -959,7 +959,7 @@ function AdminTab({ allUsers, budget, setBudget, showToast, onRefresh }: {
           <div style={{ flex:1 }}>
             <label style={{ fontSize:13, fontWeight:600, color:'#374151', display:'block', marginBottom:6 }}>月次予算（円）</label>
             <input type="number" value={newBudget} onChange={e => setNewBudget(e.target.value)} min="0"
-              style={{ width:'100%', padding:'10px 14px', border:'1.5px solid #E2E8F0', borderRadius:10, fontSize:14 }}/>
+              style={{ width:'100%', padding:'10px 14px', border:'1.5px solid #E2E8F0', borderRadius:10, fontSize:14, color:'#111827' }}/>
           </div>
           <button onClick={saveBudget} disabled={savingBudget}
             style={{ padding:'10px 20px', borderRadius:10, border:'none', cursor:'pointer', background:'#6366F1', color:'#fff', fontSize:14, fontWeight:700, whiteSpace:'nowrap' }}>
@@ -990,7 +990,7 @@ function AdminTab({ allUsers, budget, setBudget, showToast, onRefresh }: {
                 </div>
                 <div style={{ flex:1 }}>
                   <div style={{ fontSize:14, fontWeight:600, color:'#1E293B' }}>{u.name}</div>
-                  <div style={{ fontSize:12, color:'#94A3B8' }}>{u.email}</div>
+                  <div style={{ fontSize:12, color:'#374151' }}>{u.email}</div>
                 </div>
                 <select value={u.role} onChange={e => changeRole(u.id, e.target.value as 'member' | 'admin')}
                   style={{ padding:'6px 10px', border:'1.5px solid #E2E8F0', borderRadius:8, fontSize:13, background:'#fff', cursor:'pointer' }}>
