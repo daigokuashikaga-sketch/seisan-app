@@ -118,10 +118,10 @@ function LoginScreen({ onSuccess }: { onSuccess: () => void }) {
         const res = await authClient.signIn.email({ email, password })
         if (res.error) { setError(res.error.message ?? 'ログインに失敗しました'); setLoading(false); return }
       }
-      onSuccess()
+      // セッションを確実に反映させるためリロード
+      window.location.reload()
     } catch (err: any) {
       setError(err.message ?? 'エラーが発生しました')
-    } finally {
       setLoading(false)
     }
   }
