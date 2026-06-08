@@ -6,3 +6,4 @@ dist/
 .github_token
 .bun/
 *.log
+uploads/
