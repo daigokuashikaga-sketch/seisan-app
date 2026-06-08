@@ -22,5 +22,11 @@ const app = new Hono()
   .route("/users", users)
   .route("/invitations", invitations)
 
+// 未処理エラーをサーバクラッシュではなく 500 JSON として返す
+app.onError((err, c) => {
+  console.error("API error:", err)
+  return c.json({ message: "サーバーエラーが発生しました" }, 500)
+})
+
 export type AppType = typeof app
 export default app
