@@ -18,6 +18,8 @@ jobs:
       BETTER_AUTH_SECRET: "ci-test-secret-ci-test-secret"
       WEBSITE_URL: "http://localhost:3000"
       NODE_ENV: "test"
+      # web の検証に electron バイナリは不要。postinstall のDL（不安定）を回避する
+      ELECTRON_SKIP_BINARY_DOWNLOAD: "1"
     steps:
       - uses: actions/checkout@v4
 
