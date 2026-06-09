@@ -7,3 +7,9 @@ dist/
 .bun/
 *.log
 uploads/
+
+# ローカル試用DB（libSQL ファイル）
+*.db
+*.db-shm
+*.db-wal
+*.sqlite
