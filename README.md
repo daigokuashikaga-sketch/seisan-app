@@ -88,6 +88,30 @@ bun run start   # ecosystem.config.cjs で起動
 3. 招待リンク (`/?invite=CODE`) から開くと招待コードが自動補完され、登録できます。
 4. 有効な招待がない登録はサーバ側で拒否されます。
 
+## Windows デスクトップアプリ（Electron / シンクライアント）
+
+`packages/desktop` はデプロイ済みサーバーに接続する **シンクライアント** です（API/DBはサーバー側）。
+初回起動時にサーバーURLを入力すると `userData` に保存され、以降はそのサーバーを表示します。
+メニュー「Seisan > サーバーを再設定…」でいつでも変更できます。
+
+### 開発（ローカルで確認）
+
+```sh
+bun run dev            # web 開発サーバ (localhost:4200)
+bun run dev:desktop    # 別ターミナルで Electron 起動（dev時は localhost:4200 に接続）
+```
+
+### Windows インストーラ(.exe)のビルド
+
+- **CI（推奨）**: GitHub Actions の「Desktop (Windows)」ワークフローを手動実行（`workflow_dispatch`）するか、`desktop-v*` タグを push すると、`windows-latest` で未署名インストーラをビルドし、成果物 `seisan-windows-installer` としてアップロードします。
+- **Windows ローカル**:
+  ```sh
+  cd packages/desktop
+  bun run dist        # vite build + electron-builder（release/ に Seisan-Windows-*-Setup.exe）
+  ```
+
+> 注: 配布先には別途、稼働中のサーバー（`packages/web` をデプロイしたもの）が必要です。`.exe` 自体はサーバーURLを保持しないため、誰のビルドでも初回起動時に各自のサーバーを設定できます。
+
 ## ディレクトリ構成
 
 ```
