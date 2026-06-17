@@ -98,32 +98,67 @@ function Toaster({ toasts }: { toasts: Toast[] }) {
 // Login Screen
 // ──────────────────────────────────────────────
 function LoginScreen({ onSuccess }: { onSuccess: () => void }) {
-  const [mode, setMode] = useState<'login' | 'signup'>('login')
-  const [email, setEmail] = useState('')
+  // URLクエリでリセットトークン検知
+  const params = new URLSearchParams(window.location.search)
+  const urlToken = params.get('reset_token')
+  const urlEmail = params.get('email')
+
+  const [mode, setMode] = useState<'login' | 'signup' | 'forgot' | 'reset'>(
+    urlToken && urlEmail ? 'reset' : 'login'
+  )
+  const [email, setEmail] = useState(urlEmail ?? '')
   const [password, setPassword] = useState('')
+  const [newPassword, setNewPassword] = useState('')
   const [name, setName] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+  const [success, setSuccess] = useState('')
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setLoading(true)
     setError('')
+    setSuccess('')
 
     try {
       if (mode === 'signup') {
         const res = await authClient.signUp.email({ email, password, name })
         if (res.error) { setError(res.error.message ?? '登録に失敗しました'); setLoading(false); return }
-      } else {
+        window.location.reload()
+      } else if (mode === 'login') {
         const res = await authClient.signIn.email({ email, password })
         if (res.error) { setError(res.error.message ?? 'ログインに失敗しました'); setLoading(false); return }
+        window.location.reload()
+      } else if (mode === 'forgot') {
+        const res = await fetch('/api/password/send-reset-email', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email })
+        })
+        const data = await res.json()
+        if (!res.ok) { setError(data.error ?? 'エラーが発生しました'); setLoading(false); return }
+        setSuccess('リセットメールを送信しました（登録済みの場合）')
+      } else if (mode === 'reset') {
+        if (newPassword.length < 8) { setError('パスワードは8文字以上必要です'); setLoading(false); return }
+        const res = await fetch('/api/password/reset-with-token', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email, token: urlToken, newPassword })
+        })
+        const data = await res.json()
+        if (!res.ok) { setError(data.error ?? 'リセット失敗'); setLoading(false); return }
+        setSuccess('パスワードを変更しました。ログインしてください。')
+        setTimeout(() => { window.location.href = '/' }, 2000)
       }
-      // セッションを確実に反映させるためリロード
-      window.location.reload()
     } catch (err: any) {
       setError(err.message ?? 'エラーが発生しました')
-      setLoading(false)
     }
+    setLoading(false)
+  }
+
+  const modeLabel: Record<typeof mode, string> = {
+    login: 'アカウントにサインイン',
+    signup: '新しいアカウントを作成',
+    forgot: 'パスワードをリセット',
+    reset: '新しいパスワードを設定',
   }
 
   return (
@@ -143,60 +178,77 @@ function LoginScreen({ onSuccess }: { onSuccess: () => void }) {
             <Receipt size={28} color="#fff"/>
           </div>
           <h1 style={{ fontSize:22, fontWeight:700, color:'#1E293B', margin:0 }}>精算管理システム</h1>
-          <p style={{ color:'#64748B', fontSize:13, marginTop:6 }}>
-            {mode === 'login' ? 'アカウントにサインイン' : '新しいアカウントを作成'}
-          </p>
+          <p style={{ color:'#64748B', fontSize:13, marginTop:6 }}>{modeLabel[mode]}</p>
         </div>
 
         <form onSubmit={handleSubmit} style={{ display:'flex', flexDirection:'column', gap:16 }}>
           {mode === 'signup' && (
             <div>
               <label style={{ fontSize:13, fontWeight:600, color:'#374151', display:'block', marginBottom:6 }}>名前</label>
-              <input
-                type="text" value={name} onChange={e => setName(e.target.value)} required
-                placeholder="山田 太郎"
-                style={{ width:'100%', padding:'10px 14px', border:'1.5px solid #E2E8F0', borderRadius:10, fontSize:14, color:'#111827', boxSizing:'border-box', outline:'none' }}
-              />
+              <input type="text" value={name} onChange={e => setName(e.target.value)} required placeholder="山田 太郎"
+                style={{ width:'100%', padding:'10px 14px', border:'1.5px solid #E2E8F0', borderRadius:10, fontSize:14, color:'#111827', boxSizing:'border-box', outline:'none' }}/>
             </div>
           )}
-          <div>
-            <label style={{ fontSize:13, fontWeight:600, color:'#374151', display:'block', marginBottom:6 }}>メールアドレス</label>
-            <input
-              type="email" value={email} onChange={e => setEmail(e.target.value)} required
-              placeholder="you@example.com"
-              style={{ width:'100%', padding:'10px 14px', border:'1.5px solid #E2E8F0', borderRadius:10, fontSize:14, color:'#111827', boxSizing:'border-box', outline:'none' }}
-            />
-          </div>
-          <div>
-            <label style={{ fontSize:13, fontWeight:600, color:'#374151', display:'block', marginBottom:6 }}>パスワード</label>
-            <input
-              type="password" value={password} onChange={e => setPassword(e.target.value)} required
-              placeholder="••••••••"
-              style={{ width:'100%', padding:'10px 14px', border:'1.5px solid #E2E8F0', borderRadius:10, fontSize:14, color:'#111827', boxSizing:'border-box', outline:'none' }}
-            />
-          </div>
 
-          {error && (
-            <div style={{ background:'#FEE2E2', color:'#DC2626', padding:'10px 14px', borderRadius:8, fontSize:13 }}>
-              {error}
+          {mode !== 'reset' && (
+            <div>
+              <label style={{ fontSize:13, fontWeight:600, color:'#374151', display:'block', marginBottom:6 }}>メールアドレス</label>
+              <input type="email" value={email} onChange={e => setEmail(e.target.value)} required placeholder="you@example.com"
+                style={{ width:'100%', padding:'10px 14px', border:'1.5px solid #E2E8F0', borderRadius:10, fontSize:14, color:'#111827', boxSizing:'border-box', outline:'none' }}/>
             </div>
           )}
+
+          {(mode === 'login' || mode === 'signup') && (
+            <div>
+              <label style={{ fontSize:13, fontWeight:600, color:'#374151', display:'block', marginBottom:6 }}>パスワード</label>
+              <input type="password" value={password} onChange={e => setPassword(e.target.value)} required placeholder="••••••••"
+                style={{ width:'100%', padding:'10px 14px', border:'1.5px solid #E2E8F0', borderRadius:10, fontSize:14, color:'#111827', boxSizing:'border-box', outline:'none' }}/>
+            </div>
+          )}
+
+          {mode === 'reset' && (
+            <div>
+              <label style={{ fontSize:13, fontWeight:600, color:'#374151', display:'block', marginBottom:6 }}>新しいパスワード（8文字以上）</label>
+              <input type="password" value={newPassword} onChange={e => setNewPassword(e.target.value)} required placeholder="••••••••"
+                style={{ width:'100%', padding:'10px 14px', border:'1.5px solid #E2E8F0', borderRadius:10, fontSize:14, color:'#111827', boxSizing:'border-box', outline:'none' }}/>
+            </div>
+          )}
+
+          {error && <div style={{ background:'#FEE2E2', color:'#DC2626', padding:'10px 14px', borderRadius:8, fontSize:13 }}>{error}</div>}
+          {success && <div style={{ background:'#D1FAE5', color:'#059669', padding:'10px 14px', borderRadius:8, fontSize:13 }}>{success}</div>}
 
           <button type="submit" disabled={loading} style={{
             padding:'12px', borderRadius:10, border:'none', cursor:'pointer',
             background:'linear-gradient(135deg,#667eea,#764ba2)', color:'#fff',
-            fontSize:15, fontWeight:700, marginTop:4,
-            opacity: loading ? 0.7 : 1
+            fontSize:15, fontWeight:700, marginTop:4, opacity: loading ? 0.7 : 1
           }}>
-            {loading ? '処理中...' : mode === 'login' ? 'サインイン' : 'アカウント作成'}
+            {loading ? '処理中...' : mode === 'login' ? 'サインイン' : mode === 'signup' ? 'アカウント作成' : mode === 'forgot' ? 'リセットメールを送信' : 'パスワードを変更'}
           </button>
         </form>
 
-        <div style={{ textAlign:'center', marginTop:20 }}>
-          <button onClick={() => { setMode(mode === 'login' ? 'signup' : 'login'); setError('') }}
-            style={{ background:'none', border:'none', color:'#667eea', fontSize:13, cursor:'pointer', fontWeight:600 }}>
-            {mode === 'login' ? 'アカウントをお持ちでない方はこちら →' : '既にアカウントをお持ちの方はサインイン →'}
-          </button>
+        <div style={{ textAlign:'center', marginTop:20, display:'flex', flexDirection:'column', gap:8 }}>
+          {mode === 'login' && <>
+            <button onClick={() => { setMode('forgot'); setError(''); setSuccess('') }}
+              style={{ background:'none', border:'none', color:'#94A3B8', fontSize:12, cursor:'pointer' }}>
+              パスワードを忘れた場合
+            </button>
+            <button onClick={() => { setMode('signup'); setError(''); setSuccess('') }}
+              style={{ background:'none', border:'none', color:'#667eea', fontSize:13, cursor:'pointer', fontWeight:600 }}>
+              アカウントをお持ちでない方はこちら →
+            </button>
+          </>}
+          {mode === 'signup' && (
+            <button onClick={() => { setMode('login'); setError(''); setSuccess('') }}
+              style={{ background:'none', border:'none', color:'#667eea', fontSize:13, cursor:'pointer', fontWeight:600 }}>
+              既にアカウントをお持ちの方はサインイン →
+            </button>
+          )}
+          {(mode === 'forgot' || mode === 'reset') && (
+            <button onClick={() => { setMode('login'); setError(''); setSuccess(''); window.history.replaceState({}, '', '/') }}
+              style={{ background:'none', border:'none', color:'#667eea', fontSize:13, cursor:'pointer', fontWeight:600 }}>
+              ← サインインに戻る
+            </button>
+          )}
         </div>
       </div>
     </div>
@@ -917,6 +969,23 @@ function AdminTab({ allUsers, budget, setBudget, showToast, onRefresh }: {
 }) {
   const [newBudget, setNewBudget] = useState(String(budget))
   const [savingBudget, setSavingBudget] = useState(false)
+  const [pwModalUserId, setPwModalUserId] = useState<string | null>(null)
+  const [pwModalName, setPwModalName] = useState('')
+  const [newPw, setNewPw] = useState('')
+  const [pwLoading, setPwLoading] = useState(false)
+
+  const handleAdminPwChange = async () => {
+    if (!pwModalUserId || newPw.length < 8) { showToast('パスワードは8文字以上必要です', 'error'); return }
+    setPwLoading(true)
+    const res = await fetch(`/api/password/admin-reset/${pwModalUserId}`, {
+      method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+      credentials: 'include', body: JSON.stringify({ newPassword: newPw })
+    })
+    const data = await res.json()
+    if (res.ok) { showToast(`${pwModalName} のパスワードを変更しました`, 'success'); setPwModalUserId(null); setNewPw('') }
+    else showToast(data.error ?? 'パスワード変更失敗', 'error')
+    setPwLoading(false)
+  }
 
   const saveBudget = async () => {
     setSavingBudget(true)
@@ -997,6 +1066,10 @@ function AdminTab({ allUsers, budget, setBudget, showToast, onRefresh }: {
                   <option value="member">メンバー</option>
                   <option value="admin">管理者</option>
                 </select>
+                <button onClick={() => { setPwModalUserId(u.id); setPwModalName(u.name); setNewPw('') }}
+                  style={{ background:'#EEF2FF', border:'none', cursor:'pointer', color:'#6366F1', padding:'6px 10px', borderRadius:8, fontSize:12, fontWeight:600 }}>
+                  PW変更
+                </button>
                 <button onClick={() => deleteUser(u.id, u.name)}
                   style={{ background:'#FEE2E2', border:'none', cursor:'pointer', color:'#DC2626', padding:'6px 10px', borderRadius:8, fontSize:12, fontWeight:600 }}>
                   削除
@@ -1006,6 +1079,36 @@ function AdminTab({ allUsers, budget, setBudget, showToast, onRefresh }: {
           </div>
         )}
       </div>
+
+      {/* PW変更モーダル */}
+      {pwModalUserId && (
+        <div style={{
+          position:'fixed', inset:0, background:'rgba(0,0,0,.4)', display:'flex',
+          alignItems:'center', justifyContent:'center', zIndex:1000
+        }} onClick={() => setPwModalUserId(null)}>
+          <div style={{
+            background:'#fff', borderRadius:16, padding:28, width:'100%', maxWidth:360,
+            boxShadow:'0 20px 60px rgba(0,0,0,.2)'
+          }} onClick={e => e.stopPropagation()}>
+            <h3 style={{ fontSize:16, fontWeight:700, color:'#1E293B', marginBottom:4 }}>パスワード変更</h3>
+            <p style={{ fontSize:13, color:'#64748B', marginBottom:16 }}>{pwModalName}</p>
+            <label style={{ fontSize:13, fontWeight:600, color:'#374151', display:'block', marginBottom:6 }}>新しいパスワード（8文字以上）</label>
+            <input type="password" value={newPw} onChange={e => setNewPw(e.target.value)}
+              placeholder="••••••••" autoFocus
+              style={{ width:'100%', padding:'10px 14px', border:'1.5px solid #E2E8F0', borderRadius:10, fontSize:14, color:'#111827', boxSizing:'border-box', outline:'none', marginBottom:16 }}/>
+            <div style={{ display:'flex', gap:10 }}>
+              <button onClick={() => setPwModalUserId(null)}
+                style={{ flex:1, padding:'10px', borderRadius:10, border:'1.5px solid #E2E8F0', background:'#fff', color:'#64748B', fontSize:14, cursor:'pointer', fontWeight:600 }}>
+                キャンセル
+              </button>
+              <button onClick={handleAdminPwChange} disabled={pwLoading}
+                style={{ flex:1, padding:'10px', borderRadius:10, border:'none', background:'#6366F1', color:'#fff', fontSize:14, cursor:'pointer', fontWeight:700, opacity: pwLoading ? 0.7 : 1 }}>
+                {pwLoading ? '変更中...' : '変更する'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
