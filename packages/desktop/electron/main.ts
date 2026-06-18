@@ -3,127 +3,138 @@ import { fileURLToPath } from "node:url";
 import path from "node:path";
 import fs from "node:fs/promises";
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
+import { randomBytes } from "node:crypto";
+import { startServer, type RunningServer } from "./server/start-server";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
-const isDev = process.env.NODE_ENV !== "production";
+const isDev = !app.isPackaged;
 const APP_NAME = "Seisan";
+const PREFERRED_PORT = 47823;
 
-let win: BrowserWindow | null;
+let win: BrowserWindow | null = null;
+let server: RunningServer | null = null;
 
-// ── サーバーURLの解決・永続化（シンクライアント） ──
-// 優先順: 環境変数 SEISAN_SERVER_URL > userData/config.json > dev既定
-function configPath() {
-  return path.join(app.getPath("userData"), "config.json");
+// ── パス解決 ──
+// パッケージ済み: web-dist / drizzle は app.asar 内に同梱（electron-builder files）。
+// 開発時: packages/web のビルド出力を直接参照する。
+function appRoot() {
+  return app.getAppPath();
+}
+function webDistDir() {
+  return isDev
+    ? path.resolve(appRoot(), "../web/dist")
+    : path.join(appRoot(), "web-dist");
+}
+function migrationsDir() {
+  return isDev
+    ? path.resolve(appRoot(), "../web/drizzle")
+    : path.join(appRoot(), "drizzle");
 }
 
-function readServerUrl(): string | null {
-  if (process.env.SEISAN_SERVER_URL) return process.env.SEISAN_SERVER_URL;
+// Better Auth 用の秘密鍵を端末ごとに生成・永続化する。
+function resolveAuthSecret(): string {
+  const p = path.join(app.getPath("userData"), "auth-secret");
   try {
-    const p = configPath();
     if (existsSync(p)) {
-      const cfg = JSON.parse(readFileSync(p, "utf-8"));
-      if (typeof cfg.serverUrl === "string" && cfg.serverUrl) return cfg.serverUrl;
+      const s = readFileSync(p, "utf-8").trim();
+      if (s) return s;
     }
   } catch {
-    /* 壊れた設定は無視 */
+    /* 壊れていれば作り直す */
   }
-  if (isDev) return "http://localhost:4200";
-  return null;
-}
-
-function saveServerUrl(url: string) {
+  const secret = randomBytes(32).toString("hex");
   try {
-    writeFileSync(configPath(), JSON.stringify({ serverUrl: url }, null, 2));
+    writeFileSync(p, secret, { mode: 0o600 });
   } catch (e) {
-    console.error("Failed to save server URL:", e);
+    console.error("Failed to persist auth secret:", e);
   }
+  return secret;
 }
 
-function normalizeUrl(raw: string): string | null {
-  let url = raw.trim();
-  if (!url) return null;
-  if (!/^https?:\/\//i.test(url)) url = `https://${url}`;
-  try {
-    return new URL(url).toString();
-  } catch {
-    return null;
-  }
-}
-
-// 初回起動など、サーバー未設定時に表示するセットアップ画面（data URLで自己完結）
-function setupPageUrl(message = ""): string {
+// 起動中／エラー時に表示する自己完結ページ（data URL）。
+function statusPageUrl(title: string, message: string, spinner = false): string {
+  const spin = spinner
+    ? `<div class="spinner"></div>`
+    : `<div style="font-size:40px">⚠️</div>`;
   const html = `<!doctype html><html lang="ja"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>${APP_NAME} セットアップ</title>
+<title>${APP_NAME}</title>
 <style>
   body{margin:0;min-height:100vh;display:flex;align-items:center;justify-content:center;
-    font-family:-apple-system,'Segoe UI',sans-serif;background:linear-gradient(135deg,#667eea,#764ba2)}
-  .card{background:#fff;border-radius:16px;padding:32px 28px;width:360px;box-shadow:0 20px 60px rgba(0,0,0,.25)}
-  h1{font-size:18px;margin:0 0 6px;color:#1E293B}
-  p{font-size:13px;color:#64748B;margin:0 0 18px}
-  input{width:100%;box-sizing:border-box;padding:11px 14px;border:1.5px solid #E2E8F0;border-radius:10px;font-size:14px;color:#111827}
-  button{margin-top:14px;width:100%;padding:12px;border:none;border-radius:10px;cursor:pointer;
-    background:linear-gradient(135deg,#667eea,#764ba2);color:#fff;font-size:15px;font-weight:700}
-  .err{color:#DC2626;font-size:12px;margin-top:8px;min-height:16px}
+    font-family:-apple-system,'Segoe UI','Hiragino Kaku Gothic ProN',Meiryo,sans-serif;
+    background:linear-gradient(135deg,#667eea,#764ba2);color:#fff}
+  .card{text-align:center;padding:32px}
+  h1{font-size:18px;margin:14px 0 6px}
+  p{font-size:13px;opacity:.85;margin:0;max-width:360px;line-height:1.6}
+  .spinner{width:42px;height:42px;margin:0 auto;border:4px solid rgba(255,255,255,.3);
+    border-top-color:#fff;border-radius:50%;animation:spin 1s linear infinite}
+  @keyframes spin{to{transform:rotate(360deg)}}
 </style></head><body>
-  <div class="card">
-    <h1>サーバーに接続</h1>
-    <p>精算管理システムのサーバーURLを入力してください（管理者から共有されます）。</p>
-    <input id="u" placeholder="https://seisan.example.com" autofocus>
-    <div class="err" id="e">${message}</div>
-    <button id="b">接続</button>
-  </div>
-  <script>
-    const go = async () => {
-      const v = document.getElementById('u').value;
-      const ok = await window.electronAPI.setServerUrl(v);
-      if (!ok) document.getElementById('e').textContent = 'URLの形式が正しくありません';
-    };
-    document.getElementById('b').addEventListener('click', go);
-    document.getElementById('u').addEventListener('keydown', e => { if (e.key === 'Enter') go(); });
-  </script>
+  <div class="card">${spin}<h1>${title}</h1><p>${message}</p></div>
 </body></html>`;
   return `data:text/html;charset=utf-8,${encodeURIComponent(html)}`;
 }
 
-function loadApp() {
-  if (!win) return;
-  const serverUrl = readServerUrl();
-  if (serverUrl) {
-    win.loadURL(serverUrl);
-  } else {
-    win.loadURL(setupPageUrl());
-  }
-}
-
 function createWindow() {
   win = new BrowserWindow({
-    width: 1200,
-    height: 800,
+    width: 1280,
+    height: 860,
+    minWidth: 940,
+    minHeight: 600,
     title: APP_NAME,
+    backgroundColor: "#764ba2",
+    show: false,
     webPreferences: {
       preload: path.join(__dirname, "preload.mjs"),
       contextIsolation: true,
       nodeIntegration: false,
     },
   });
-  loadApp();
+
+  win.once("ready-to-show", () => win?.show());
+  win.loadURL(statusPageUrl("起動しています…", "ローカルサーバーを準備中です。", true));
 }
 
-// --- IPC Handlers ---
+// サーバーを起動して画面を読み込む。失敗時はエラーページを表示。
+async function boot() {
+  try {
+    server = await startServer({
+      webDist: webDistDir(),
+      migrationsFolder: migrationsDir(),
+      dbPath: path.join(app.getPath("userData"), "seisan.db"),
+      uploadDir: path.join(app.getPath("userData"), "uploads"),
+      authSecret: resolveAuthSecret(),
+      preferredPort: PREFERRED_PORT,
+    });
+    await loadAppWithRetry(server.url);
+  } catch (e) {
+    console.error("Server failed to start:", e);
+    const msg = e instanceof Error ? e.message : String(e);
+    win?.loadURL(
+      statusPageUrl(
+        "起動に失敗しました",
+        `アプリの初期化中に問題が発生しました。アプリを再起動してください。<br><br>${msg}`,
+      ),
+    );
+  }
+}
 
-// サーバーURL設定（シンクライアント）
-ipcMain.handle("config:get-server-url", () => readServerUrl());
-ipcMain.handle("config:set-server-url", (_, raw: string) => {
-  const url = normalizeUrl(raw);
-  if (!url) return false;
-  saveServerUrl(url);
-  loadApp();
-  return true;
-});
+// サーバー起動直後はまれに接続が安定しないため数回リトライする。
+async function loadAppWithRetry(url: string, attempts = 8) {
+  for (let i = 0; i < attempts; i++) {
+    try {
+      await win?.loadURL(url);
+      return;
+    } catch (e) {
+      if (i === attempts - 1) throw e;
+      await new Promise((r) => setTimeout(r, 300));
+    }
+  }
+}
 
-// Dialog
+// --- IPC Handlers（フロントの preload API に対応） ---
+
 ipcMain.handle("dialog:open", async (_, opts) => {
   const result = await dialog.showOpenDialog(opts);
   return result.canceled ? [] : result.filePaths;
@@ -134,7 +145,6 @@ ipcMain.handle("dialog:save", async (_, opts) => {
   return result.canceled ? null : result.filePath;
 });
 
-// File system
 ipcMain.handle("fs:read", async (_, filePath: string) => {
   return fs.readFile(filePath, "utf-8");
 });
@@ -143,33 +153,26 @@ ipcMain.handle("fs:write", async (_, filePath: string, data: string) => {
   await fs.writeFile(filePath, data, "utf-8");
 });
 
-// Notifications
 ipcMain.handle("notification:show", (_, title: string, body: string) => {
   new Notification({ title, body }).show();
 });
 
-// Window controls
 ipcMain.handle("window:minimize", () => win?.minimize());
 ipcMain.handle("window:maximize", () => {
-  if (win?.isMaximized()) {
-    win.unmaximize();
-  } else {
-    win?.maximize();
-  }
+  if (win?.isMaximized()) win.unmaximize();
+  else win?.maximize();
 });
 ipcMain.handle("window:close", () => win?.close());
 
-// --- メニュー（サーバー再設定 / 再読み込み） ---
+// --- メニュー ---
 function buildMenu() {
   const menu = Menu.buildFromTemplate([
     {
       label: APP_NAME,
       submenu: [
-        {
-          label: "サーバーを再設定…",
-          click: () => win?.loadURL(setupPageUrl()),
-        },
-        { label: "再読み込み", click: () => loadApp() },
+        { label: `${APP_NAME} について`, role: "about" },
+        { type: "separator" },
+        { label: "再読み込み", click: () => server && win?.loadURL(server.url) },
         { type: "separator" },
         { role: "quit", label: "終了" },
       ],
@@ -195,21 +198,34 @@ function buildMenu() {
 
 // --- App lifecycle ---
 
-app.on("window-all-closed", () => {
-  if (process.platform !== "darwin") {
-    app.quit();
-    win = null;
-  }
-});
+// 単一インスタンスに限定（DB を複数プロセスで開かない）。
+const gotLock = app.requestSingleInstanceLock();
+if (!gotLock) {
+  app.quit();
+} else {
+  app.on("second-instance", () => {
+    if (win) {
+      if (win.isMinimized()) win.restore();
+      win.focus();
+    }
+  });
 
-app.on("activate", () => {
-  if (BrowserWindow.getAllWindows().length === 0) {
+  app.on("window-all-closed", () => {
+    if (process.platform !== "darwin") app.quit();
+  });
+
+  app.on("activate", () => {
+    if (BrowserWindow.getAllWindows().length === 0) createWindow();
+  });
+
+  app.on("before-quit", () => {
+    server?.close().catch(() => {});
+  });
+
+  app.whenReady().then(() => {
+    app.setName(APP_NAME);
+    buildMenu();
     createWindow();
-  }
-});
-
-app.whenReady().then(() => {
-  app.setName(APP_NAME);
-  buildMenu();
-  createWindow();
-});
+    boot();
+  });
+}

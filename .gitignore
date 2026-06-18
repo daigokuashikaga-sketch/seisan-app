@@ -17,3 +17,6 @@ uploads/
 # Electron ビルド成果物
 dist-electron/
 release/
+# desktop に同梱用としてコピーされる web ビルド/マイグレーション
+packages/desktop/web-dist/
+packages/desktop/drizzle/

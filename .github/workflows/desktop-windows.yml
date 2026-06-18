@@ -1,12 +1,14 @@
 name: Desktop (Windows)
 
 # Windows用デスクトップ(.exe)を windows ランナーでビルドし成果物化する。
-# 手動実行(workflow_dispatch) または desktop-v* タグの push でトリガー。
+# 手動実行(workflow_dispatch) / desktop-v* タグ / 開発ブランチへの push でトリガー。
 on:
   workflow_dispatch:
   push:
     tags:
       - "desktop-v*"
+    branches:
+      - "claude/**"
 
 jobs:
   build-windows:

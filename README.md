@@ -88,29 +88,40 @@ bun run start   # ecosystem.config.cjs で起動
 3. 招待リンク (`/?invite=CODE`) から開くと招待コードが自動補完され、登録できます。
 4. 有効な招待がない登録はサーバ側で拒否されます。
 
-## Windows デスクトップアプリ（Electron / シンクライアント）
+## Windows デスクトップアプリ（Electron / スタンドアロン）
 
-`packages/desktop` はデプロイ済みサーバーに接続する **シンクライアント** です（API/DBはサーバー側）。
-初回起動時にサーバーURLを入力すると `userData` に保存され、以降はそのサーバーを表示します。
-メニュー「Seisan > サーバーを再設定…」でいつでも変更できます。
+`packages/desktop` は **サーバー不要のスタンドアロンアプリ** です。`.exe` を起動するだけで動きます。
+
+- Electron の main プロセス内に Hono API サーバーを埋め込み、`127.0.0.1` で起動します。
+- データはその PC 内の **ローカル SQLite**（libSQL）に保存（`userData/seisan.db`）。領収書画像も `userData/uploads` に保存。
+- 初回起動時に DB マイグレーションを自動実行。最初に作成したアカウントが**管理者**になり、以降は管理者が発行した招待でメンバーを追加できます（社内複数ユーザー対応）。
+- 外部ネットワーク・別途サーバーのデプロイは不要。オフラインで利用できます。
+
+### 起動後の流れ（利用者向け）
+
+1. `.exe`（または `Seisan-Windows-x.y.z-Setup.exe`）でインストール・起動。
+2. 最初のユーザーがアカウント作成 → 自動で管理者に。
+3. 管理者が「メンバー管理」から招待を発行し、同じ PC で各メンバーがログイン。
 
 ### 開発（ローカルで確認）
 
 ```sh
-bun run dev            # web 開発サーバ (localhost:4200)
-bun run dev:desktop    # 別ターミナルで Electron 起動（dev時は localhost:4200 に接続）
+# 1) web フロントをビルド（Electron はビルド済み静的ファイルを配信）
+cd packages/desktop && bun run build:web && bun run prepare:assets
+# 2) Electron を起動（埋め込みサーバーが起動し localhost:47823 を表示）
+bun run dev
 ```
 
 ### Windows インストーラ(.exe)のビルド
 
-- **CI（推奨）**: GitHub Actions の「Desktop (Windows)」ワークフローを手動実行（`workflow_dispatch`）するか、`desktop-v*` タグを push すると、`windows-latest` で未署名インストーラをビルドし、成果物 `seisan-windows-installer` としてアップロードします。
+- **CI（推奨）**: GitHub Actions の「Desktop (Windows)」ワークフローが、手動実行（`workflow_dispatch`）/ `desktop-v*` タグ / `claude/**` ブランチへの push でトリガーされ、`windows-latest` で未署名インストーラをビルドし、成果物 `seisan-windows-installer` としてアップロードします。
 - **Windows ローカル**:
   ```sh
   cd packages/desktop
-  bun run dist        # vite build + electron-builder（release/ に Seisan-Windows-*-Setup.exe）
+  bun run dist        # web ビルド + 同梱 + electron-builder（release/ に Seisan-Windows-*-Setup.exe）
   ```
 
-> 注: 配布先には別途、稼働中のサーバー（`packages/web` をデプロイしたもの）が必要です。`.exe` 自体はサーバーURLを保持しないため、誰のビルドでも初回起動時に各自のサーバーを設定できます。
+> 配布物は完全に自己完結しており、起動だけで利用できます。データは各 PC ローカルに保存されるため、PC 間でのデータ共有は行いません。
 
 ## ディレクトリ構成
 
@@ -131,6 +142,10 @@ packages/web/
       lib/               api（型付きクライアント）/ auth / receiptOcr
     shared/constants.ts  フロント・バック共有の定数/enum
   drizzle/               マイグレーション
-packages/desktop/        Electron シェル
+packages/desktop/        Electron（埋め込みサーバー + ローカルSQLite のスタンドアロン）
+  electron/
+    main.ts              ウィンドウ/ライフサイクル/サーバー起動
+    server/start-server  Hono API + 静的配信 + マイグレーションの埋め込み起動
+    preload.ts           contextBridge（dialog/fs/notification/window）
 packages/mobile/         Expo アプリ
 ```

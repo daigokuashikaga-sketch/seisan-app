@@ -3,12 +3,6 @@ import { ipcRenderer, contextBridge } from "electron";
 contextBridge.exposeInMainWorld("electronAPI", {
   platform: process.platform,
 
-  // サーバーURL設定（シンクライアント）
-  getServerUrl: (): Promise<string | null> =>
-    ipcRenderer.invoke("config:get-server-url"),
-  setServerUrl: (url: string): Promise<boolean> =>
-    ipcRenderer.invoke("config:set-server-url", url),
-
   // Dialog
   showOpenDialog: (opts: Electron.OpenDialogOptions) =>
     ipcRenderer.invoke("dialog:open", opts),

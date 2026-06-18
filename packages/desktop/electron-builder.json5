@@ -9,7 +9,15 @@
   },
   "files": [
     "dist",
-    "dist-electron"
+    "dist-electron",
+    "web-dist",
+    "drizzle"
+  ],
+  // ネイティブモジュール（libSQL の .node）は asar から展開して実行時にロードする。
+  "asarUnpack": [
+    "**/*.node",
+    "node_modules/@libsql/**",
+    "node_modules/libsql/**"
   ],
   "mac": {
     "target": [
