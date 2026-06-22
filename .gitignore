@@ -20,3 +20,7 @@ release/
 # desktop に同梱用としてコピーされる web ビルド/マイグレーション
 packages/desktop/web-dist/
 packages/desktop/drizzle/
+
+# プレゼン用のローカル成果物（コード対象外。ユーザーへ直接共有済み）
+.demo/
+*.pptx
