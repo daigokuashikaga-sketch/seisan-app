@@ -13,6 +13,8 @@ on:
 jobs:
   build-windows:
     runs-on: windows-latest
+    permissions:
+      contents: write   # desktop-v* タグ時に Release を作成・アセット添付するため
     steps:
       - uses: actions/checkout@v4
 
@@ -40,3 +42,30 @@ jobs:
           path: |
             packages/desktop/release/**/*.exe
           if-no-files-found: error
+
+      # desktop-v* タグを push したときだけ、GitHub Release に .exe を直接添付する。
+      # 公開リポジトリなので、リリースページから誰でもログイン不要でダウンロードできる。
+      - name: Publish GitHub Release
+        if: startsWith(github.ref, 'refs/tags/desktop-v')
+        uses: softprops/action-gh-release@v2
+        with:
+          name: 経費精算デスクトップアプリ ${{ github.ref_name }}
+          files: packages/desktop/release/**/*.exe
+          draft: false
+          prerelease: false
+          body: |
+            ## 経費精算デスクトップアプリ（Windows・スタンドアロン）
+
+            **下の Assets にある `Seisan-Windows-*-Setup.exe` をダウンロードして実行するだけで使えます。**
+            サーバー準備や設定は不要で、データはお使いの PC 内に保存されます（オフライン動作）。
+
+            ### 使い方
+            1. `Seisan-Windows-*-Setup.exe` をダウンロード
+            2. ダブルクリックしてインストール（画面の指示に従う）
+            3. 起動して最初のアカウントを作成 → そのまま利用開始（最初の登録者が管理者になります）
+
+            ### ⚠️ ご注意（未署名アプリ）
+            コード署名をしていないため、初回起動時に **「WindowsによってPCが保護されました」** という青い警告が出ることがあります。
+            その場合は **「詳細情報」→「実行」** を押すと起動できます（このアプリが原因の警告で、動作に問題はありません）。
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
