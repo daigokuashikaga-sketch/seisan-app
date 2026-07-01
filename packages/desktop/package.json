@@ -15,10 +15,20 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@libsql/client": "^0.17.2"
+    "libsql": "^0.5.29",
+    "@neon-rs/load": "^0.0.4",
+    "detect-libc": "2.0.2"
+  },
+  "optionalDependencies": {
+    "@libsql/win32-x64-msvc": "^0.5.29",
+    "@libsql/linux-x64-gnu": "^0.5.29",
+    "@libsql/linux-x64-musl": "^0.5.29",
+    "@libsql/darwin-x64": "^0.5.29",
+    "@libsql/darwin-arm64": "^0.5.29"
   },
   "devDependencies": {
     "@hono/node-server": "^1.13.7",
+    "@libsql/client": "^0.17.2",
     "@template/web": "workspace:*",
     "@types/node": "^25.9.2",
     "drizzle-orm": "^0.45.2",
