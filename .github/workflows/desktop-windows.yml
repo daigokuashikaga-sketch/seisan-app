@@ -39,13 +39,21 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: seisan-windows-installer
+          # インストーラ本体のみ（elevate.exe や 展開済み Seisan.exe を除外）
           path: |
-            packages/desktop/release/**/*.exe
+            packages/desktop/release/**/*-Setup.exe
           if-no-files-found: error
 
-      # desktop-v* タグ push、または手動実行(workflow_dispatch)のときに
-      # GitHub Release へ .exe を直接添付する。tag_name を明示するため、
-      # タグを手で push しなくても Release とタグを自動生成できる。
+      # 既存の desktop-v0.1.0 リリース/タグを一旦削除して作り直す。
+      # （前回ビルドで付いた余計なアセットを残さず、常にインストーラ1点だけにする）
+      - name: Clean previous release
+        if: github.event_name == 'workflow_dispatch' || startsWith(github.ref, 'refs/tags/desktop-v')
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh release delete desktop-v0.1.0 --yes --cleanup-tag --repo ${{ github.repository }} || echo "no existing release"
+
+      # 手動実行(workflow_dispatch)または desktop-v* タグ時に GitHub Release へ
+      # インストーラ(.exe)を添付。tag_name 明示によりタグ手動pushは不要。
       # 公開リポジトリなので、リリースページから誰でもログイン不要でダウンロード可能。
       - name: Publish GitHub Release
         if: github.event_name == 'workflow_dispatch' || startsWith(github.ref, 'refs/tags/desktop-v')
@@ -53,7 +61,7 @@ jobs:
         with:
           tag_name: desktop-v0.1.0
           name: 経費精算デスクトップアプリ v0.1.0
-          files: packages/desktop/release/**/*.exe
+          files: packages/desktop/release/**/*-Setup.exe
           draft: false
           prerelease: false
           body: |
