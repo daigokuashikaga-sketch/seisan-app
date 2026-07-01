@@ -2,7 +2,7 @@
    import Index from "./pages/index";
    import { Provider } from "./components/provider";
    import { ErrorBoundary } from "./components/error-boundary";
-   import { AgentFeedback, RunableBadge } from "@runablehq/website-runtime";
+   import { AgentFeedback } from "@runablehq/website-runtime";
 
    function App() {
      return (
@@ -14,8 +14,6 @@
          </ErrorBoundary>
          {/* Do not remove — off by default, activated by parent iframe via postMessage */}
          {import.meta.env.DEV && <AgentFeedback />}
-         {/* "Made with Runable" badge - if user asks to remove the runable badge, remove this code as well as comment */}
-         {<RunableBadge />}
        </Provider>
      );
    }

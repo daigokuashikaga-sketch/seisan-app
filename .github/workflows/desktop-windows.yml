@@ -50,7 +50,9 @@ jobs:
         if: github.event_name == 'workflow_dispatch' || startsWith(github.ref, 'refs/tags/desktop-v')
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: gh release delete desktop-v0.1.0 --yes --cleanup-tag --repo ${{ github.repository }} || echo "no existing release"
+        run: |
+          gh release delete desktop-v0.1.0 --yes --cleanup-tag --repo ${{ github.repository }} || echo "no v0.1.0"
+          gh release delete desktop-v0.1.1 --yes --cleanup-tag --repo ${{ github.repository }} || echo "no v0.1.1"
 
       # 手動実行(workflow_dispatch)または desktop-v* タグ時に GitHub Release へ
       # インストーラ(.exe)を添付。tag_name 明示によりタグ手動pushは不要。
@@ -59,8 +61,8 @@ jobs:
         if: github.event_name == 'workflow_dispatch' || startsWith(github.ref, 'refs/tags/desktop-v')
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: desktop-v0.1.0
-          name: 経費精算デスクトップアプリ v0.1.0
+          tag_name: desktop-v0.1.1
+          name: 経費精算デスクトップアプリ v0.1.1
           files: packages/desktop/release/**/*-Setup.exe
           draft: false
           prerelease: false
