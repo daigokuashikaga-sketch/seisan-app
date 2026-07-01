@@ -48,11 +48,13 @@ jobs:
       # （前回ビルドで付いた余計なアセットを残さず、常にインストーラ1点だけにする）
       - name: Clean previous release
         if: github.event_name == 'workflow_dispatch' || startsWith(github.ref, 'refs/tags/desktop-v')
+        shell: bash
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          gh release delete desktop-v0.1.0 --yes --cleanup-tag --repo ${{ github.repository }} || echo "no v0.1.0"
-          gh release delete desktop-v0.1.1 --yes --cleanup-tag --repo ${{ github.repository }} || echo "no v0.1.1"
+          gh release delete desktop-v0.1.0 --yes --cleanup-tag --repo "$GITHUB_REPOSITORY" || echo "no v0.1.0"
+          gh release delete desktop-v0.1.1 --yes --cleanup-tag --repo "$GITHUB_REPOSITORY" || echo "no v0.1.1"
+          exit 0
 
       # 手動実行(workflow_dispatch)または desktop-v* タグ時に GitHub Release へ
       # インストーラ(.exe)を添付。tag_name 明示によりタグ手動pushは不要。
