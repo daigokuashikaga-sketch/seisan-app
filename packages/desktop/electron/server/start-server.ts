@@ -75,6 +75,13 @@ function resolvePort(preferred: number): Promise<number> {
   });
 }
 
+// 静的配信にもクリックジャッキング/MIMEスニッフィング対策のヘッダを付ける
+const STATIC_SECURITY_HEADERS = {
+  "X-Content-Type-Options": "nosniff",
+  "X-Frame-Options": "SAMEORIGIN",
+  "Referrer-Policy": "no-referrer",
+} as const;
+
 /** webDist 配下の静的ファイルを返す（SPA フォールバックで index.html）。 */
 async function serveStatic(webDist: string, pathname: string): Promise<Response> {
   const indexPath = path.join(webDist, "index.html");
@@ -87,14 +94,14 @@ async function serveStatic(webDist: string, pathname: string): Promise<Response>
   try {
     const data = await fs.readFile(candidate);
     return new Response(new Uint8Array(data), {
-      headers: { "Content-Type": mimeFor(candidate) },
+      headers: { "Content-Type": mimeFor(candidate), ...STATIC_SECURITY_HEADERS },
     });
   } catch {
     // 見つからなければ SPA のエントリへフォールバック
     try {
       const html = await fs.readFile(indexPath);
       return new Response(new Uint8Array(html), {
-        headers: { "Content-Type": "text/html; charset=utf-8" },
+        headers: { "Content-Type": "text/html; charset=utf-8", ...STATIC_SECURITY_HEADERS },
       });
     } catch {
       return new Response("Web build output not found.", {

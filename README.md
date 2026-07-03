@@ -88,40 +88,74 @@ bun run start   # ecosystem.config.cjs で起動
 3. 招待リンク (`/?invite=CODE`) から開くと招待コードが自動補完され、登録できます。
 4. 有効な招待がない登録はサーバ側で拒否されます。
 
-## Windows デスクトップアプリ（Electron / スタンドアロン）
+## Windows デスクトップアプリ（Electron / デュアルモード）
 
-`packages/desktop` は **サーバー不要のスタンドアロンアプリ** です。`.exe` を起動するだけで動きます。
+`packages/desktop` は `.exe` を起動するだけで動くデスクトップアプリです。初回起動時に**利用方法を選択**できます（メニュー「動作モードを変更…」でいつでも切替可）。
 
-- Electron の main プロセス内に Hono API サーバーを埋め込み、`127.0.0.1` で起動します。
-- データはその PC 内の **ローカル SQLite**（libSQL）に保存（`userData/seisan.db`）。領収書画像も `userData/uploads` に保存。
-- 初回起動時に DB マイグレーションを自動実行。最初に作成したアカウントが**管理者**になり、以降は管理者が発行した招待でメンバーを追加できます（社内複数ユーザー対応）。
-- 外部ネットワーク・別途サーバーのデプロイは不要。オフラインで利用できます。
+| モード | データの保存先 | 用途 |
+|---|---|---|
+| 💻 **オフライン**（この PC だけで使う）| PC 内のローカル SQLite（`userData/seisan.db`）| 個人・1台運用。サーバー不要・ネット不要 |
+| 🌐 **オンライン**（共有サーバーに接続）| 接続先サーバーの DB | 複数 PC・複数メンバーでデータ共有 |
+
+**オフラインモード**は Electron の main プロセス内に Hono API サーバーを埋め込み `127.0.0.1` で起動します。初回起動時に DB マイグレーションを自動実行。領収書画像も `userData/uploads` に保存され、メニュー「**データをバックアップ…**」で DB＋画像の整合スナップショット（`VACUUM INTO`）を任意のフォルダに書き出せます。
+
+**オンラインモード**は下記「オンライン運用（共有サーバー）」でデプロイしたサーバーの URL を入力して接続します。接続前にヘルスチェックで URL を検証します。企業配布では環境変数 `SEISAN_SERVER_URL` で接続先を固定でき、設定画面をスキップできます。
+
+どちらのモードでも: 最初に作成したアカウントが**管理者**になり、以降は管理者が発行した招待でメンバーを追加します（招待制）。
+
+### セキュリティ対策（v0.2.0）
+
+- **認証レート制限**: `POST /api/auth/*` はクライアントあたり 20回/分（ブルートフォース対策、429 + Retry-After）
+- **セキュリティヘッダ**: API・静的配信の両方に `X-Frame-Options` / `X-Content-Type-Options` / `Referrer-Policy` 等を付与
+- **リクエストサイズ上限**: 8MB（領収書5MB＋multipartオーバーヘッド）
+- **Electron 側**: レンダラーの `sandbox` 有効化、`contextIsolation`、アプリのオリジン以外へのナビゲーション遮断（外部リンクは既定ブラウザで開く）、`window.open` 拒否
+- **認証**: パスワード最小8文字、ロールはサーバー側でのみ付与（クライアントから昇格不可）、セッションは HttpOnly Cookie
+- 既存: zod による全ミューテーション検証、認可ガード（最後の管理者保護等）、CORS/trustedOrigins の許可リスト化、領収書のMIME/サイズ検証とパストラバーサル防止
 
 ### 起動後の流れ（利用者向け）
 
-1. `.exe`（または `Seisan-Windows-x.y.z-Setup.exe`）でインストール・起動。
-2. 最初のユーザーがアカウント作成 → 自動で管理者に。
-3. 管理者が「メンバー管理」から招待を発行し、同じ PC で各メンバーがログイン。
+1. `Seisan-Windows-x.y.z-Setup.exe` でインストール・起動。
+2. モードを選択（オフライン ＝ すぐ使える／オンライン ＝ 管理者から共有されたサーバーURLを入力）。
+3. 最初のユーザーがアカウント作成 → 自動で管理者に。
+4. 管理者が「管理」タブから招待を発行し、メンバーを追加。
+
+### オンライン運用（共有サーバーのデプロイ）
+
+複数 PC でデータを共有する場合は、`packages/web` をサーバーにデプロイします。Docker が最も簡単です:
+
+```sh
+docker build -t seisan .
+docker run -d --name seisan -p 3000:3000 \
+  -e WEBSITE_URL=https://seisan.example.com \
+  -e ALLOWED_ORIGINS=https://seisan.example.com \
+  -e BETTER_AUTH_SECRET=$(openssl rand -hex 32) \
+  -e DATABASE_URL=file:/data/seisan.db \
+  -v seisan-data:/data -v seisan-uploads:/app/uploads \
+  seisan
+```
+
+- `DATABASE_URL` はローカルファイル（`file:` + 永続ボリューム）のほか、Turso（`libsql://...` + `DATABASE_AUTH_TOKEN`）も利用可能。
+- **本番では必ず HTTPS で公開**してください（リバースプロキシ / TLS 終端）。Cookie 保護・盗聴防止のため必須です。
+- レート制限はプロキシの `X-Forwarded-For` を参照します。プロキシで正しく設定してください。
+- デプロイ後、デスクトップアプリの「共有サーバーに接続」にその URL を入力すれば接続できます（ブラウザから直接同じ URL を開いても利用可能）。
 
 ### 開発（ローカルで確認）
 
 ```sh
 # 1) web フロントをビルド（Electron はビルド済み静的ファイルを配信）
 cd packages/desktop && bun run build:web && bun run prepare:assets
-# 2) Electron を起動（埋め込みサーバーが起動し localhost:47823 を表示）
+# 2) Electron を起動（モード選択画面が表示される）
 bun run dev
 ```
 
 ### Windows インストーラ(.exe)のビルド
 
-- **CI（推奨）**: GitHub Actions の「Desktop (Windows)」ワークフローが、手動実行（`workflow_dispatch`）/ `desktop-v*` タグ / `claude/**` ブランチへの push でトリガーされ、`windows-latest` で未署名インストーラをビルドし、成果物 `seisan-windows-installer` としてアップロードします。
+- **CI（推奨）**: GitHub Actions の「Desktop (Windows)」ワークフローが、手動実行（`workflow_dispatch`）/ `desktop-v*` タグ / `claude/**` ブランチへの push でトリガーされ、`windows-latest` で未署名インストーラをビルドし、成果物アップロード＋ GitHub Release への公開を行います。
 - **Windows ローカル**:
   ```sh
   cd packages/desktop
   bun run dist        # web ビルド + 同梱 + electron-builder（release/ に Seisan-Windows-*-Setup.exe）
   ```
-
-> 配布物は完全に自己完結しており、起動だけで利用できます。データは各 PC ローカルに保存されるため、PC 間でのデータ共有は行いません。
 
 ## ディレクトリ構成
 
@@ -142,10 +176,11 @@ packages/web/
       lib/               api（型付きクライアント）/ auth / receiptOcr
     shared/constants.ts  フロント・バック共有の定数/enum
   drizzle/               マイグレーション
-packages/desktop/        Electron（埋め込みサーバー + ローカルSQLite のスタンドアロン）
+packages/desktop/        Electron（オフライン=埋め込みサーバー / オンライン=共有サーバー接続）
   electron/
-    main.ts              ウィンドウ/ライフサイクル/サーバー起動
+    main.ts              ウィンドウ/ライフサイクル/モード選択/サーバー起動
     server/start-server  Hono API + 静的配信 + マイグレーションの埋め込み起動
-    preload.ts           contextBridge（dialog/fs/notification/window）
+    server/backup.ts     DB整合スナップショット(VACUUM INTO) + 領収書のバックアップ
+    preload.ts           contextBridge（モード設定/バックアップ/dialog/fs/notification/window）
 packages/mobile/         Expo アプリ
 ```

@@ -17,7 +17,7 @@ export const auth = betterAuth({
       verification: schema.verifications,
     },
   }),
-  emailAndPassword: { enabled: true },
+  emailAndPassword: { enabled: true, minPasswordLength: 8 },
   secret: process.env.BETTER_AUTH_SECRET,
   trustedOrigins: getAllowedOrigins(),
   user: {

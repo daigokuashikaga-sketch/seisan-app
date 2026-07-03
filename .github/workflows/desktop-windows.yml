@@ -52,8 +52,9 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          gh release delete desktop-v0.1.0 --yes --cleanup-tag --repo "$GITHUB_REPOSITORY" || echo "no v0.1.0"
-          gh release delete desktop-v0.1.1 --yes --cleanup-tag --repo "$GITHUB_REPOSITORY" || echo "no v0.1.1"
+          for tag in desktop-v0.1.0 desktop-v0.1.1 desktop-v0.2.0; do
+            gh release delete "$tag" --yes --cleanup-tag --repo "$GITHUB_REPOSITORY" || echo "no $tag"
+          done
           exit 0
 
       # 手動実行(workflow_dispatch)または desktop-v* タグ時に GitHub Release へ
@@ -63,21 +64,31 @@ jobs:
         if: github.event_name == 'workflow_dispatch' || startsWith(github.ref, 'refs/tags/desktop-v')
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: desktop-v0.1.1
-          name: 経費精算デスクトップアプリ v0.1.1
+          tag_name: desktop-v0.2.0
+          name: 経費精算デスクトップアプリ v0.2.0
           files: packages/desktop/release/**/*-Setup.exe
           draft: false
           prerelease: false
           body: |
-            ## 経費精算デスクトップアプリ（Windows・スタンドアロン）
+            ## 経費精算デスクトップアプリ（Windows）
 
             **下の Assets にある `Seisan-Windows-*-Setup.exe` をダウンロードして実行するだけで使えます。**
-            サーバー準備や設定は不要で、データはお使いの PC 内に保存されます（オフライン動作）。
+            初回起動時に、利用方法を選択できます。
+
+            | モード | 説明 |
+            |---|---|
+            | 💻 **オフライン**（この PC だけで使う）| データは PC 内に保存。サーバー不要・ネット不要で今すぐ使える |
+            | 🌐 **オンライン**（共有サーバーに接続）| 会社にデプロイしたサーバーへ接続し、複数 PC・メンバーでデータ共有 |
 
             ### 使い方
-            1. `Seisan-Windows-*-Setup.exe` をダウンロード
-            2. ダブルクリックしてインストール（画面の指示に従う）
-            3. 起動して最初のアカウントを作成 → そのまま利用開始（最初の登録者が管理者になります）
+            1. `Seisan-Windows-*-Setup.exe` をダウンロードしてインストール
+            2. 起動 → モードを選択（メニューからいつでも変更可能）
+            3. 最初のアカウントを作成 → 利用開始（最初の登録者が管理者になります）
+
+            ### v0.2.0 の新機能
+            - オフライン／オンラインのデュアルモード対応（初回起動時に選択）
+            - データバックアップ機能（メニュー →「データをバックアップ…」）
+            - セキュリティ強化: 認証のレート制限、セキュリティヘッダ、外部ナビゲーション遮断、レンダラーサンドボックス化
 
             ### ⚠️ ご注意（未署名アプリ）
             コード署名をしていないため、初回起動時に **「WindowsによってPCが保護されました」** という青い警告が出ることがあります。
