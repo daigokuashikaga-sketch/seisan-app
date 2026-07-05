@@ -49,8 +49,20 @@ describe("rateLimit middleware", () => {
     }
   })
 
-  it("x-forwarded-for でクライアントごとに独立してカウントする", async () => {
+  it("既定では x-forwarded-for を信頼せずグローバル集約する（詐称でのバイパス不可）", async () => {
     process.env.NODE_ENV = "development"
+    delete process.env.TRUST_PROXY
+    const app = makeLimitedApp({ windowMs: 60_000, max: 1, methods: ["POST"] })
+    const a1 = await app.request("/auth/sign-in", { method: "POST", headers: { "x-forwarded-for": "10.0.0.1" } })
+    // XFFを変えても同一バケット → 2回目はブロック（詐称による回避を防ぐ）
+    const a2 = await app.request("/auth/sign-in", { method: "POST", headers: { "x-forwarded-for": "9.9.9.9" } })
+    expect(a1.status).toBe(200)
+    expect(a2.status).toBe(429)
+  })
+
+  it("TRUST_PROXY=1 のときのみ x-forwarded-for でクライアントを分離する", async () => {
+    process.env.NODE_ENV = "development"
+    process.env.TRUST_PROXY = "1"
     const app = makeLimitedApp({ windowMs: 60_000, max: 1, methods: ["POST"] })
     const a1 = await app.request("/auth/sign-in", { method: "POST", headers: { "x-forwarded-for": "10.0.0.1" } })
     const a2 = await app.request("/auth/sign-in", { method: "POST", headers: { "x-forwarded-for": "10.0.0.1" } })
@@ -58,6 +70,7 @@ describe("rateLimit middleware", () => {
     expect(a1.status).toBe(200)
     expect(a2.status).toBe(429)
     expect(b1.status).toBe(200)
+    delete process.env.TRUST_PROXY
   })
 
   it("ウィンドウが過ぎるとカウントがリセットされる", async () => {

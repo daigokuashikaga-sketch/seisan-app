@@ -18,11 +18,6 @@ contextBridge.exposeInMainWorld("electronAPI", {
   showSaveDialog: (opts: Electron.SaveDialogOptions) =>
     ipcRenderer.invoke("dialog:save", opts),
 
-  // File system
-  readFile: (path: string) => ipcRenderer.invoke("fs:read", path),
-  writeFile: (path: string, data: string) =>
-    ipcRenderer.invoke("fs:write", path, data),
-
   // Notifications
   showNotification: (title: string, body: string) =>
     ipcRenderer.invoke("notification:show", title, body),

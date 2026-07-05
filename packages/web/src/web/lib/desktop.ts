@@ -14,10 +14,6 @@ export interface ElectronAPI {
     filters?: { name: string; extensions: string[] }[];
   }) => Promise<string | null>;
 
-  // File system
-  readFile: (path: string) => Promise<string>;
-  writeFile: (path: string, data: string) => Promise<void>;
-
   // Notifications
   showNotification: (title: string, body: string) => Promise<void>;
 

@@ -1,7 +1,6 @@
 import { app, BrowserWindow, ipcMain, dialog, Notification, Menu, shell } from "electron";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
-import fs from "node:fs/promises";
 import { existsSync, readFileSync, writeFileSync, cpSync, copyFileSync, mkdirSync } from "node:fs";
 import { randomBytes } from "node:crypto";
 import { startServer, type RunningServer } from "./server/start-server";
@@ -271,6 +270,16 @@ function showSetupPage(message = "") {
   win?.loadURL(setupPageUrl(message));
 }
 
+// 読み込み中URLが現在のアプリのオリジンと厳密一致するか（ナビゲーションガード用）
+function isAppOrigin(url: string): boolean {
+  if (!allowedOrigin) return false;
+  try {
+    return new URL(url).origin === new URL(allowedOrigin).origin;
+  } catch {
+    return false;
+  }
+}
+
 // ── ウィンドウ ──
 
 function createWindow() {
@@ -292,13 +301,18 @@ function createWindow() {
 
   win.once("ready-to-show", () => win?.show());
 
-  // ナビゲーションガード: アプリのオリジンと設定画面(data:)以外への遷移を禁止し、
-  // 外部リンクは既定ブラウザで開く（http/https のみ）。
+  // ナビゲーションガード: アプリのオリジン（厳密一致）以外への遷移をすべて禁止する。
+  // 前方一致だと http://127.0.0.1:47823.evil.com 等でバイパスされるため origin で比較。
+  // レンダラー起点の data: 遷移も拒否（正規の data: 画面は main が loadURL で読み込む）。
   win.webContents.on("will-navigate", (e, url) => {
-    if (url.startsWith("data:")) return;
-    if (allowedOrigin && url.startsWith(allowedOrigin)) return;
+    if (isAppOrigin(url)) return;
     e.preventDefault();
     if (/^https?:\/\//i.test(url)) shell.openExternal(url);
+  });
+  // サーバー側 3xx リダイレクトによるガード迂回を防ぐ
+  win.webContents.on("will-redirect", (e, url) => {
+    if (isAppOrigin(url)) return;
+    e.preventDefault();
   });
   win.webContents.setWindowOpenHandler(({ url }) => {
     if (/^https?:\/\//i.test(url)) shell.openExternal(url);
@@ -309,7 +323,7 @@ function createWindow() {
   win.webContents.on("did-fail-load", (_e, code, _desc, url) => {
     if (booting) return; // 起動リトライ中は boot 側がハンドリングする
     if (code === -3 /* ABORTED: 画面遷移等の正常中断 */) return;
-    if (allowedOrigin && url.startsWith(allowedOrigin)) {
+    if (isAppOrigin(url)) {
       win?.loadURL(
         statusPageUrl(
           "サーバーに接続できません",
@@ -468,13 +482,9 @@ ipcMain.handle("dialog:save", async (_, opts) => {
   return result.canceled ? null : result.filePath;
 });
 
-ipcMain.handle("fs:read", async (_, filePath: string) => {
-  return fs.readFile(filePath, "utf-8");
-});
-
-ipcMain.handle("fs:write", async (_, filePath: string, data: string) => {
-  await fs.writeFile(filePath, data, "utf-8");
-});
+// 注: 任意パスへの読み書きを行う fs:read / fs:write IPC は撤去した。
+// オンラインモードではリモートページに露出し、端末の全ファイルを読み書きされる
+// 恐れがあったため（フロントエンドでも未使用）。
 
 ipcMain.handle("notification:show", (_, title: string, body: string) => {
   new Notification({ title, body }).show();
