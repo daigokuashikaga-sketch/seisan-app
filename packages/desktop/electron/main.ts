@@ -1,7 +1,7 @@
 import { app, BrowserWindow, ipcMain, dialog, Notification, Menu, shell } from "electron";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
-import { existsSync, readFileSync, writeFileSync, cpSync, copyFileSync, mkdirSync } from "node:fs";
+import { existsSync, readFileSync, writeFileSync, cpSync, copyFileSync, mkdirSync, rmSync } from "node:fs";
 import { randomBytes } from "node:crypto";
 import { startServer, type RunningServer } from "./server/start-server";
 import { backupAll } from "./server/backup";
@@ -402,7 +402,8 @@ async function loadAppWithRetry(url: string, attempts = 8) {
 
 // ── バックアップ（スタンドアロンのみ） ──
 
-async function runBackupInteractive(): Promise<void> {
+// 戻り値: 実際にバックアップが完了したら true（キャンセル・失敗・非対応モードは false）。
+async function runBackupInteractive(): Promise<boolean> {
   const cfg = readConfig();
   if (cfg.mode !== "standalone" || !server) {
     dialog.showMessageBox(win!, {
@@ -411,13 +412,13 @@ async function runBackupInteractive(): Promise<void> {
       message: "バックアップはオフラインモードでのみ利用できます",
       detail: "オンラインモードのデータは接続先サーバーで管理されています。サーバー管理者にお問い合わせください。",
     });
-    return;
+    return false;
   }
   const res = await dialog.showOpenDialog(win!, {
     title: "バックアップの保存先フォルダを選択",
     properties: ["openDirectory", "createDirectory"],
   });
-  if (res.canceled || !res.filePaths[0]) return;
+  if (res.canceled || !res.filePaths[0]) return false;
   try {
     const { dir } = await backupAll(dbPath(), uploadsDir(), res.filePaths[0]);
     new Notification({
@@ -425,13 +426,98 @@ async function runBackupInteractive(): Promise<void> {
       body: dir,
     }).show();
     shell.showItemInFolder(path.join(dir, "seisan.db"));
+    return true;
   } catch (e) {
     console.error("Backup failed:", e);
     dialog.showErrorBox(
       "バックアップに失敗しました",
       e instanceof Error ? e.message : String(e),
     );
+    return false;
   }
+}
+
+// ── データの初期化（リセット・スタンドアロンのみ） ──
+//
+// 使用中の SQLite ファイルは（特に Windows で）ロックされて削除できないため、
+// 「初期化予約マーカーを書く → アプリを再起動 → 新プロセス起動時に削除」する。
+// 実際の削除は performPendingResetIfAny() が行う。
+function resetMarkerPath() {
+  return path.join(app.getPath("userData"), "reset-pending");
+}
+
+// 起動直後（DB を開く前）に呼ぶ。予約があれば DB と領収書を削除して初期状態に戻す。
+function performPendingResetIfAny() {
+  try {
+    if (!existsSync(resetMarkerPath())) return;
+    for (const f of ["seisan.db", "seisan.db-wal", "seisan.db-shm"]) {
+      rmSync(path.join(app.getPath("userData"), f), { force: true });
+    }
+    rmSync(uploadsDir(), { recursive: true, force: true });
+    rmSync(resetMarkerPath(), { force: true });
+    console.log("Pending reset performed: cleared database and uploads.");
+  } catch (e) {
+    console.error("Pending reset failed:", e);
+  }
+}
+
+async function runResetInteractive(): Promise<void> {
+  const cfg = readConfig();
+  if (cfg.mode !== "standalone") {
+    dialog.showMessageBox(win!, {
+      type: "info",
+      title: "データの初期化",
+      message: "初期化はオフラインモードでのみ利用できます",
+      detail:
+        "オンラインモードのデータは接続先サーバーで管理されています。サーバー管理者にお問い合わせください。",
+    });
+    return;
+  }
+
+  const { response } = await dialog.showMessageBox(win!, {
+    type: "warning",
+    title: "データを初期化（リセット）",
+    message: "すべてのデータを削除して初期状態に戻しますか？",
+    detail:
+      "登録済みのアカウント・経費申請・領収書画像がすべて削除されます。\n" +
+      "初期化後は、最初に登録した人がふたたび管理者になります。\n\n" +
+      "この操作は取り消せません。必要であれば先にバックアップしてください。",
+    buttons: ["キャンセル", "バックアップしてから初期化", "初期化する"],
+    defaultId: 0,
+    cancelId: 0,
+    noLink: true,
+  });
+  if (response === 0) return;
+  if (response === 1) {
+    const backedUp = await runBackupInteractive();
+    if (!backedUp) return; // バックアップをやめたら初期化も中止
+  }
+
+  const confirm = await dialog.showMessageBox(win!, {
+    type: "warning",
+    title: "最終確認",
+    message: "本当に初期化しますか？",
+    detail: "アプリを再起動し、すべてのデータを削除します。",
+    buttons: ["キャンセル", "初期化して再起動"],
+    defaultId: 0,
+    cancelId: 0,
+    noLink: true,
+  });
+  if (confirm.response !== 1) return;
+
+  try {
+    writeFileSync(resetMarkerPath(), new Date().toISOString());
+  } catch (e) {
+    dialog.showErrorBox("初期化に失敗しました", e instanceof Error ? e.message : String(e));
+    return;
+  }
+  // 開いている DB 接続を解放するため、サーバーを止めてから再起動する。
+  if (server) {
+    await server.close().catch(() => {});
+    server = null;
+  }
+  app.relaunch();
+  app.exit(0);
 }
 
 // --- IPC Handlers ---
@@ -515,6 +601,7 @@ function buildMenu() {
         { label: "動作モードを変更…", click: () => showSetupPage() },
         { type: "separator" },
         { label: "データをバックアップ…", click: () => runBackupInteractive() },
+        { label: "データを初期化（リセット）…", click: () => runResetInteractive() },
         { type: "separator" },
         { role: "quit", label: "終了" },
       ],
@@ -567,6 +654,7 @@ if (!gotLock) {
   app.whenReady().then(() => {
     app.setName(APP_NAME);
     migrateLegacyUserData();
+    performPendingResetIfAny();
     buildMenu();
     createWindow();
     bootFromConfig();
