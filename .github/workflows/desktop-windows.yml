@@ -52,7 +52,7 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          for tag in desktop-v0.1.0 desktop-v0.1.1 desktop-v0.2.0; do
+          for tag in desktop-v0.1.0 desktop-v0.1.1 desktop-v0.2.0 desktop-v0.3.0; do
             gh release delete "$tag" --yes --cleanup-tag --repo "$GITHUB_REPOSITORY" || echo "no $tag"
           done
           exit 0
@@ -64,8 +64,8 @@ jobs:
         if: github.event_name == 'workflow_dispatch' || startsWith(github.ref, 'refs/tags/desktop-v')
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: desktop-v0.2.0
-          name: 経費精算デスクトップアプリ v0.2.0
+          tag_name: desktop-v0.3.0
+          name: 経費精算デスクトップアプリ v0.3.0
           files: packages/desktop/release/**/*-Setup.exe
           draft: false
           prerelease: false
@@ -85,7 +85,12 @@ jobs:
             2. 起動 → モードを選択（メニューからいつでも変更可能）
             3. 最初のアカウントを作成 → 利用開始（最初の登録者が管理者になります）
 
-            ### v0.2.0 の新機能
+            ### v0.3.0 の新機能
+            - **データを初期化（リセット）機能**（メニュー →「データを初期化（リセット）…」）
+              - 全データを削除して初期状態に戻せます。招待制で登録に詰まったとき、最初の管理者からやり直せます
+              - 使用中DBのロックを避けるため、確認後にアプリを再起動して削除する安全な方式
+
+            ### v0.2.0 の機能
             - オフライン／オンラインのデュアルモード対応（初回起動時に選択）
             - データバックアップ機能（メニュー →「データをバックアップ…」）
             - セキュリティ強化: 認証のレート制限、セキュリティヘッダ、外部ナビゲーション遮断、レンダラーサンドボックス化
