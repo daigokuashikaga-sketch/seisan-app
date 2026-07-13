@@ -10,6 +10,7 @@ import { expenses } from "./routes/expenses"
 import { settings } from "./routes/settings"
 import { users } from "./routes/users"
 import { invitations } from "./routes/invitations"
+import { password } from "./routes/password"
 
 // 認証エンドポイントのブルートフォース対策（1分あたり20回まで/クライアント）
 const authRateLimit = rateLimit({ windowMs: 60_000, max: 20, methods: ["POST"], keyPrefix: "auth" })
@@ -34,6 +35,7 @@ const app = new Hono()
   .route("/settings", settings)
   .route("/users", users)
   .route("/invitations", invitations)
+  .route("/password", password)
 
 // 未処理エラーをサーバクラッシュではなく 500 JSON として返す
 app.onError((err, c) => {

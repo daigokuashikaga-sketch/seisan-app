@@ -21,6 +21,7 @@
   },
   "dependencies": {
     "@libsql/client": "^0.17.2",
+    "@noble/hashes": "^2.2.0",
     "@radix-ui/react-slot": "^1.2.4",
     "@runablehq/website-runtime": "^0.10.0",
     "@tanstack/react-query": "^5.100.6",
