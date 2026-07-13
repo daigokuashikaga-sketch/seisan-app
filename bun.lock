@@ -3,7 +3,7 @@
   "configVersion": 1,
   "workspaces": {
     "": {
-      "name": "sandbox-platform-template",
+      "name": "seisan-app",
       "dependencies": {
         "@aws-sdk/client-s3": "^3.1023.0",
         "@libsql/client": "^0.17.2",
