@@ -1,0 +1,102 @@
+name: Desktop (Windows)
+
+# Windows用デスクトップ(.exe)を windows ランナーでビルドし成果物化する。
+# 手動実行(workflow_dispatch) / desktop-v* タグ / 開発ブランチへの push でトリガー。
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - "desktop-v*"
+    branches:
+      - "claude/**"
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+    permissions:
+      contents: write   # desktop-v* タグ時に Release を作成・アセット添付するため
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.3.5
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Build Windows installer
+        working-directory: packages/desktop
+        env:
+          # 署名証明書なしのビルド（未署名インストーラ）
+          CSC_IDENTITY_AUTO_DISCOVERY: "false"
+        run: |
+          bun run build
+          bunx electron-builder --win nsis --publish never
+
+      - name: Upload installer artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: seisan-windows-installer
+          # インストーラ本体のみ（elevate.exe や 展開済み Seisan.exe を除外）
+          path: |
+            packages/desktop/release/**/*-Setup.exe
+          if-no-files-found: error
+
+      # 既存の desktop-v0.1.0 リリース/タグを一旦削除して作り直す。
+      # （前回ビルドで付いた余計なアセットを残さず、常にインストーラ1点だけにする）
+      - name: Clean previous release
+        if: github.event_name == 'workflow_dispatch' || startsWith(github.ref, 'refs/tags/desktop-v')
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          for tag in desktop-v0.1.0 desktop-v0.1.1 desktop-v0.2.0 desktop-v0.3.0; do
+            gh release delete "$tag" --yes --cleanup-tag --repo "$GITHUB_REPOSITORY" || echo "no $tag"
+          done
+          exit 0
+
+      # 手動実行(workflow_dispatch)または desktop-v* タグ時に GitHub Release へ
+      # インストーラ(.exe)を添付。tag_name 明示によりタグ手動pushは不要。
+      # 公開リポジトリなので、リリースページから誰でもログイン不要でダウンロード可能。
+      - name: Publish GitHub Release
+        if: github.event_name == 'workflow_dispatch' || startsWith(github.ref, 'refs/tags/desktop-v')
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: desktop-v0.3.0
+          name: 経費精算デスクトップアプリ v0.3.0
+          files: packages/desktop/release/**/*-Setup.exe
+          draft: false
+          prerelease: false
+          body: |
+            ## 経費精算デスクトップアプリ（Windows）
+
+            **下の Assets にある `Seisan-Windows-*-Setup.exe` をダウンロードして実行するだけで使えます。**
+            初回起動時に、利用方法を選択できます。
+
+            | モード | 説明 |
+            |---|---|
+            | 💻 **オフライン**（この PC だけで使う）| データは PC 内に保存。サーバー不要・ネット不要で今すぐ使える |
+            | 🌐 **オンライン**（共有サーバーに接続）| 会社にデプロイしたサーバーへ接続し、複数 PC・メンバーでデータ共有 |
+
+            ### 使い方
+            1. `Seisan-Windows-*-Setup.exe` をダウンロードしてインストール
+            2. 起動 → モードを選択（メニューからいつでも変更可能）
+            3. 最初のアカウントを作成 → 利用開始（最初の登録者が管理者になります）
+
+            ### v0.3.0 の新機能
+            - **データを初期化（リセット）機能**（メニュー →「データを初期化（リセット）…」）
+              - 全データを削除して初期状態に戻せます。招待制で登録に詰まったとき、最初の管理者からやり直せます
+              - 使用中DBのロックを避けるため、確認後にアプリを再起動して削除する安全な方式
+
+            ### v0.2.0 の機能
+            - オフライン／オンラインのデュアルモード対応（初回起動時に選択）
+            - データバックアップ機能（メニュー →「データをバックアップ…」）
+            - セキュリティ強化: 認証のレート制限、セキュリティヘッダ、外部ナビゲーション遮断、レンダラーサンドボックス化
+
+            ### ⚠️ ご注意（未署名アプリ）
+            コード署名をしていないため、初回起動時に **「WindowsによってPCが保護されました」** という青い警告が出ることがあります。
+            その場合は **「詳細情報」→「実行」** を押すと起動できます（このアプリが原因の警告で、動作に問題はありません）。
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

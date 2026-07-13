@@ -1,8 +1,13 @@
 {
   "extends": "../../tsconfig.json",
   "compilerOptions": {
-    "lib": ["ESNext"],
-    "types": ["node"]
+    // main プロセスは Node ランタイムだが、埋め込みサーバーが Web 標準の
+    // Request/Response を扱い、取り込む @template/web の API コードも
+    // DOM lib 前提で書かれているため DOM を含める。
+    "lib": ["ESNext", "DOM", "DOM.Iterable"],
+    "types": ["node"],
+    // @template/web の API コードは元々 noUncheckedIndexedAccess 前提ではないため緩和。
+    "noUncheckedIndexedAccess": false
   },
   "include": ["electron"]
 }

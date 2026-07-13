@@ -4,6 +4,13 @@ const port = Number(process.env.PORT ?? 3000);
 const distDir = `${import.meta.dir}/../dist`;
 const indexPath = `${distDir}/index.html`;
 
+// 静的配信にもクリックジャッキング/MIMEスニッフィング対策のヘッダを付ける
+const STATIC_SECURITY_HEADERS = {
+  "X-Content-Type-Options": "nosniff",
+  "X-Frame-Options": "SAMEORIGIN",
+  "Referrer-Policy": "no-referrer",
+} as const;
+
 const server = Bun.serve({
   port,
   async fetch(request) {
@@ -17,13 +24,13 @@ const server = Bun.serve({
     const file = Bun.file(filePath);
 
     if (await file.exists()) {
-      return new Response(file);
+      return new Response(file, { headers: { ...STATIC_SECURITY_HEADERS } });
     }
 
     const index = Bun.file(indexPath);
     if (await index.exists()) {
       return new Response(index, {
-        headers: { "Content-Type": "text/html; charset=utf-8" },
+        headers: { "Content-Type": "text/html; charset=utf-8", ...STATIC_SECURITY_HEADERS },
       });
     }
 

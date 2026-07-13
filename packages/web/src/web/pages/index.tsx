@@ -1,15 +1,13 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import {
-  Receipt, LayoutDashboard, CheckSquare, ClipboardList,
-  LogOut, ChevronDown, Upload, AlertTriangle, Check, X, Info,
-  TrendingUp, Wallet, Clock, Ban, Search, Filter, ChevronUp,
-  ArrowUpRight, Pencil, Eye, Bell, Download, Settings, Users,
-  ChevronLeft, ChevronRight, RefreshCw
+  Receipt, LayoutDashboard, ClipboardList,
+  LogOut, Upload, AlertTriangle, Check, X,
+  TrendingUp, Wallet, Clock, Search,
+  Eye, Download, Settings, Users, RefreshCw, UserPlus, Copy
 } from 'lucide-react'
 import '../styles.css'
 import { scanReceipt } from '../lib/receiptOcr'
 import { authClient } from '../lib/auth'
-import { api } from '../lib/api'
 
 // ──────────────────────────────────────────────
 // CSV Export Utility
@@ -40,7 +38,7 @@ type Status = 'pending' | 'approved' | 'rejected'
 interface Expense {
   id: string; title: string; amount: number; date: string; category: string
   submitterId: string; submitterName: string; status: Status; note?: string | null
-  aiWarning?: string | null; receiptImageKey?: string | null; createdAt: string | number
+  aiWarning?: string | null; rejectionReason?: string | null; receiptImageKey?: string | null; createdAt: string | number
 }
 interface Toast { id: string; message: string; type: 'success' | 'error' | 'info'; visible: boolean }
 type Tab = 'form' | 'history' | 'admin' | 'dashboard'
@@ -97,19 +95,22 @@ function Toaster({ toasts }: { toasts: Toast[] }) {
 // ──────────────────────────────────────────────
 // Login Screen
 // ──────────────────────────────────────────────
-function LoginScreen({ onSuccess }: { onSuccess: () => void }) {
-  // URLクエリでリセットトークン検知
+function LoginScreen() {
   const params = new URLSearchParams(window.location.search)
+  // パスワードリセットのトークン（?reset_token=...&email=...）
   const urlToken = params.get('reset_token')
   const urlEmail = params.get('email')
+  // 招待リンク（?invite=CODE）が付いていれば signup モードで開き、コードを補完
+  const initialInvite = params.get('invite') ?? ''
 
   const [mode, setMode] = useState<'login' | 'signup' | 'forgot' | 'reset'>(
-    urlToken && urlEmail ? 'reset' : 'login'
+    urlToken && urlEmail ? 'reset' : initialInvite ? 'signup' : 'login'
   )
   const [email, setEmail] = useState(urlEmail ?? '')
   const [password, setPassword] = useState('')
   const [newPassword, setNewPassword] = useState('')
   const [name, setName] = useState('')
+  const [inviteCode, setInviteCode] = useState(initialInvite)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
@@ -122,7 +123,11 @@ function LoginScreen({ onSuccess }: { onSuccess: () => void }) {
 
     try {
       if (mode === 'signup') {
-        const res = await authClient.signUp.email({ email, password, name })
+        // 招待コードはヘッダーで送り、サーバ側の招待ゲートで検証する
+        const res = await authClient.signUp.email(
+          { email, password, name },
+          { headers: inviteCode ? { 'x-invite-code': inviteCode } : undefined },
+        )
         if (res.error) { setError(res.error.message ?? '登録に失敗しました'); setLoading(false); return }
         window.location.reload()
       } else if (mode === 'login') {
@@ -183,11 +188,25 @@ function LoginScreen({ onSuccess }: { onSuccess: () => void }) {
 
         <form onSubmit={handleSubmit} style={{ display:'flex', flexDirection:'column', gap:16 }}>
           {mode === 'signup' && (
-            <div>
-              <label style={{ fontSize:13, fontWeight:600, color:'#374151', display:'block', marginBottom:6 }}>名前</label>
-              <input type="text" value={name} onChange={e => setName(e.target.value)} required placeholder="山田 太郎"
-                style={{ width:'100%', padding:'10px 14px', border:'1.5px solid #E2E8F0', borderRadius:10, fontSize:14, color:'#111827', boxSizing:'border-box', outline:'none' }}/>
-            </div>
+            <>
+              <div>
+                <label style={{ fontSize:13, fontWeight:600, color:'#374151', display:'block', marginBottom:6 }}>名前</label>
+                <input
+                  type="text" value={name} onChange={e => setName(e.target.value)} required
+                  placeholder="山田 太郎"
+                  style={{ width:'100%', padding:'10px 14px', border:'1.5px solid #E2E8F0', borderRadius:10, fontSize:14, color:'#111827', boxSizing:'border-box', outline:'none' }}
+                />
+              </div>
+              <div>
+                <label style={{ fontSize:13, fontWeight:600, color:'#374151', display:'block', marginBottom:6 }}>招待コード</label>
+                <input
+                  type="text" value={inviteCode} onChange={e => setInviteCode(e.target.value)}
+                  placeholder="管理者から受け取った招待コード"
+                  style={{ width:'100%', padding:'10px 14px', border:'1.5px solid #E2E8F0', borderRadius:10, fontSize:14, color:'#111827', boxSizing:'border-box', outline:'none' }}
+                />
+                <p style={{ fontSize:11, color:'#94A3B8', marginTop:4 }}>※ 最初の登録者は管理者になります（招待コード不要）</p>
+              </div>
+            </>
           )}
 
           {mode !== 'reset' && (
@@ -325,7 +344,6 @@ export default function App() {
 
   // Summary state
   const [summaryByMonth, setSummaryByMonth] = useState<Record<string, any>>({})
-  const [summaryByYear, setSummaryByYear] = useState<Record<string, any>>({})
 
   // Admin: all users
   const [allUsers, setAllUsers] = useState<any[]>([])
@@ -360,7 +378,7 @@ export default function App() {
     if (!currentUser) return
     fetch('/api/expenses/summary', { credentials: 'include' })
       .then(r => r.json())
-      .then(d => { setSummaryByMonth(d.byMonth ?? {}); setSummaryByYear(d.byYear ?? {}) })
+      .then(d => { setSummaryByMonth(d.byMonth ?? {}) })
       .catch(console.error)
   }, [currentUser?.id, refreshKey])
 
@@ -394,7 +412,7 @@ export default function App() {
   }
 
   if (!currentUser) {
-    return <LoginScreen onSuccess={refresh}/>
+    return <LoginScreen/>
   }
 
   // ── Filtered expenses for current view ──
@@ -489,7 +507,7 @@ export default function App() {
       {/* ── Main Content ── */}
       <div style={{ marginLeft:220, padding:'32px 32px 32px' }}>
         {tab === 'form' && (
-          <FormTab currentUser={currentUser} budget={budget} showToast={showToast} onSubmitted={refresh}/>
+          <FormTab showToast={showToast} onSubmitted={refresh}/>
         )}
         {tab === 'history' && (
           <HistoryTab
@@ -506,10 +524,9 @@ export default function App() {
             expenses={filtered} totalAmount={totalAmount}
             approvedAmount={approvedAmount} pendingAmount={pendingAmount}
             budget={budget} budgetUsed={budgetUsed}
-            summaryByMonth={summaryByMonth} summaryByYear={summaryByYear}
+            summaryByMonth={summaryByMonth}
             filterYear={filterYear} filterMonth={filterMonth}
             setFilterYear={setFilterYear} setFilterMonth={setFilterMonth}
-            currentUser={currentUser}
           />
         )}
         {tab === 'admin' && currentUser.role === 'admin' && (
@@ -526,14 +543,15 @@ export default function App() {
 // ──────────────────────────────────────────────
 // Form Tab
 // ──────────────────────────────────────────────
-function FormTab({ currentUser, budget, showToast, onSubmitted }: {
-  currentUser: CurrentUser; budget: number; showToast: (m: string, t?: Toast['type']) => void; onSubmitted: () => void
+function FormTab({ showToast, onSubmitted }: {
+  showToast: (m: string, t?: Toast['type']) => void; onSubmitted: () => void
 }) {
   const [form, setForm] = useState({ title:'', amount:'', date: new Date().toISOString().slice(0,10), category: CATEGORIES[0], note:'' })
   const [submitting, setSubmitting] = useState(false)
   const [scanning, setScanning] = useState(false)
   const [ocrResult, setOcrResult] = useState<string | null>(null)
   const [receiptKey, setReceiptKey] = useState<string | null>(null)
+  const [receiptName, setReceiptName] = useState<string | null>(null)
   const fileRef = useRef<HTMLInputElement>(null)
 
   const set = (k: string, v: string) => setForm(p => ({ ...p, [k]: v }))
@@ -544,6 +562,19 @@ function FormTab({ currentUser, budget, showToast, onSubmitted }: {
     setScanning(true)
     setOcrResult(null)
     try {
+      // 領収書画像を保存（承認時に管理者が閲覧できるようにする）
+      const fd = new FormData()
+      fd.append('file', file)
+      const upload = await fetch('/api/expenses/receipt', { method: 'POST', credentials: 'include', body: fd })
+      if (upload.ok) {
+        const { key } = await upload.json()
+        setReceiptKey(key)
+        setReceiptName(file.name)
+      } else {
+        const err = await upload.json().catch(() => ({}))
+        showToast(err.message ?? '領収書の保存に失敗しました', 'error')
+      }
+      // OCRで金額・日付・件名を自動入力
       const result = await scanReceipt(file)
       if (result.amount) set('amount', String(result.amount))
       if (result.date) set('date', result.date)
@@ -577,6 +608,8 @@ function FormTab({ currentUser, budget, showToast, onSubmitted }: {
       if (data.expense?.aiWarning) showToast('⚠️ ' + data.expense.aiWarning, 'info')
       setForm({ title:'', amount:'', date: new Date().toISOString().slice(0,10), category: CATEGORIES[0], note:'' })
       setOcrResult(null)
+      setReceiptKey(null)
+      setReceiptName(null)
       onSubmitted()
     } catch { showToast('ネットワークエラー', 'error') } finally { setSubmitting(false) }
   }
@@ -609,6 +642,7 @@ function FormTab({ currentUser, budget, showToast, onSubmitted }: {
         {ocrResult && (
           <div style={{ marginTop:10, background:'#EEF2FF', border:'1px solid #C7D2FE', borderRadius:10, padding:'10px 14px', fontSize:13, color:'#4338CA' }}>
             ✅ OCR結果: {ocrResult}
+            {receiptName && <div style={{ marginTop:4, color:'#4F46E5' }}>📎 {receiptName} を添付しました</div>}
           </div>
         )}
       </div>
@@ -672,13 +706,18 @@ function HistoryTab({
 }) {
   const [detail, setDetail] = useState<Expense | null>(null)
 
-  const handleStatusChange = async (id: string, status: Status) => {
+  const handleStatusChange = async (id: string, status: Status, rejectionReason?: string) => {
     const res = await fetch(`/api/expenses/${id}/status`, {
       method: 'PATCH', headers: { 'Content-Type': 'application/json' },
-      credentials: 'include', body: JSON.stringify({ status })
+      credentials: 'include', body: JSON.stringify({ status, rejectionReason: rejectionReason ?? null })
     })
     if (res.ok) { showToast('ステータスを更新しました', 'success'); onRefresh() }
     else showToast('更新に失敗しました', 'error')
+  }
+
+  const handleReject = (id: string) => {
+    const reason = window.prompt('却下理由を入力してください（任意）') ?? ''
+    handleStatusChange(id, 'rejected', reason.trim() || undefined)
   }
 
   const handleDelete = async (id: string) => {
@@ -788,7 +827,7 @@ function HistoryTab({
                         {currentUser.role === 'admin' && e.status === 'pending' && (
                           <>
                             <button onClick={() => handleStatusChange(e.id, 'approved')} style={{ background:'#D1FAE5', border:'none', cursor:'pointer', color:'#059669', padding:'4px 8px', borderRadius:6, fontSize:12, fontWeight:600 }}>承認</button>
-                            <button onClick={() => handleStatusChange(e.id, 'rejected')} style={{ background:'#FEE2E2', border:'none', cursor:'pointer', color:'#DC2626', padding:'4px 8px', borderRadius:6, fontSize:12, fontWeight:600 }}>却下</button>
+                            <button onClick={() => handleReject(e.id)} style={{ background:'#FEE2E2', border:'none', cursor:'pointer', color:'#DC2626', padding:'4px 8px', borderRadius:6, fontSize:12, fontWeight:600 }}>却下</button>
                             <button onClick={() => handleDelete(e.id)} style={{ background:'none', border:'none', cursor:'pointer', color:'#CBD5E1', padding:4 }}><X size={16}/></button>
                           </>
                         )}
@@ -828,6 +867,25 @@ function HistoryTab({
                 <span style={{ color:'#1E293B', fontWeight:600, textAlign:'right', maxWidth:'60%' }}>{v}</span>
               </div>
             ))}
+            {detail.status === 'rejected' && detail.rejectionReason && (
+              <div style={{ background:'#FEE2E2', border:'1px solid #FECACA', borderRadius:10, padding:'10px 14px', marginTop:14, fontSize:13, color:'#991B1B' }}>
+                <div style={{ fontWeight:700, marginBottom:2 }}>却下理由</div>
+                {detail.rejectionReason}
+              </div>
+            )}
+            {detail.receiptImageKey && (
+              <div style={{ marginTop:16 }}>
+                <div style={{ fontSize:13, fontWeight:600, color:'#374151', marginBottom:8 }}>領収書</div>
+                <a href={`/api/expenses/${detail.id}/receipt`} target="_blank" rel="noreferrer">
+                  <img
+                    src={`/api/expenses/${detail.id}/receipt`}
+                    alt="領収書"
+                    style={{ width:'100%', borderRadius:10, border:'1px solid #E2E8F0', cursor:'zoom-in' }}
+                    onError={(e) => { (e.currentTarget.style.display = 'none') }}
+                  />
+                </a>
+              </div>
+            )}
           </div>
         </div>
       )}
@@ -840,13 +898,12 @@ function HistoryTab({
 // ──────────────────────────────────────────────
 function DashboardTab({
   expenses, totalAmount, approvedAmount, pendingAmount,
-  budget, budgetUsed, summaryByMonth, summaryByYear,
-  filterYear, filterMonth, setFilterYear, setFilterMonth, currentUser
+  budget, budgetUsed, summaryByMonth,
+  filterYear, filterMonth, setFilterYear, setFilterMonth
 }: {
   expenses: Expense[]; totalAmount: number; approvedAmount: number; pendingAmount: number
-  budget: number; budgetUsed: number; summaryByMonth: Record<string, any>; summaryByYear: Record<string, any>
+  budget: number; budgetUsed: number; summaryByMonth: Record<string, any>
   filterYear: string; filterMonth: string; setFilterYear: (v: string) => void; setFilterMonth: (v: string) => void
-  currentUser: CurrentUser
 }) {
   const years = Array.from({ length: 5 }, (_, i) => String(new Date().getFullYear() - i))
   const months = Array.from({ length: 12 }, (_, i) => ({ value: String(i+1).padStart(2,'0'), label: `${i+1}月` }))
@@ -987,6 +1044,50 @@ function AdminTab({ allUsers, budget, setBudget, showToast, onRefresh }: {
     setPwLoading(false)
   }
 
+  // 招待管理
+  const [invites, setInvites] = useState<any[]>([])
+  const [inviteEmail, setInviteEmail] = useState('')
+  const [inviteRole, setInviteRole] = useState<'member' | 'admin'>('member')
+  const [lastLink, setLastLink] = useState<string | null>(null)
+  const [inviting, setInviting] = useState(false)
+
+  const loadInvites = async () => {
+    const res = await fetch('/api/invitations', { credentials: 'include' })
+    if (res.ok) { const d = await res.json(); setInvites(d.invitations ?? []) }
+  }
+  useEffect(() => { loadInvites() }, [])
+
+  const createInvite = async () => {
+    if (!inviteEmail) { showToast('メールアドレスを入力してください', 'error'); return }
+    setInviting(true)
+    const res = await fetch('/api/invitations', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      credentials: 'include', body: JSON.stringify({ email: inviteEmail, role: inviteRole })
+    })
+    if (res.ok) {
+      const d = await res.json()
+      setLastLink(d.link)
+      setInviteEmail('')
+      showToast('招待を作成しました', 'success')
+      loadInvites()
+    } else {
+      const e = await res.json().catch(() => ({}))
+      showToast(e.message ?? '招待の作成に失敗しました', 'error')
+    }
+    setInviting(false)
+  }
+
+  const cancelInvite = async (id: string) => {
+    const res = await fetch(`/api/invitations/${id}`, { method: 'DELETE', credentials: 'include' })
+    if (res.ok) { showToast('招待を取り消しました', 'success'); loadInvites() }
+    else showToast('取り消しに失敗しました', 'error')
+  }
+
+  const copyLink = (link: string) => {
+    navigator.clipboard?.writeText(link)
+    showToast('リンクをコピーしました', 'success')
+  }
+
   const saveBudget = async () => {
     setSavingBudget(true)
     const res = await fetch('/api/settings/budget', {
@@ -1035,6 +1136,52 @@ function AdminTab({ allUsers, budget, setBudget, showToast, onRefresh }: {
             {savingBudget ? '保存中...' : '保存'}
           </button>
         </div>
+      </div>
+
+      {/* Member Invitations */}
+      <div style={{ background:'#fff', borderRadius:16, padding:24, boxShadow:'0 2px 12px rgba(0,0,0,.06)', marginBottom:24 }}>
+        <h3 style={{ fontSize:16, fontWeight:700, color:'#1E293B', marginBottom:6, display:'flex', alignItems:'center', gap:8 }}>
+          <UserPlus size={18} color="#6366F1"/> メンバー招待
+        </h3>
+        <p style={{ color:'#64748B', fontSize:13, marginBottom:16 }}>招待リンクを発行し、メンバーに共有してください（リンクから登録できます）</p>
+        <div style={{ display:'flex', gap:12, alignItems:'flex-end', flexWrap:'wrap' }}>
+          <div style={{ flex:1, minWidth:200 }}>
+            <label style={{ fontSize:13, fontWeight:600, color:'#374151', display:'block', marginBottom:6 }}>メールアドレス</label>
+            <input type="email" value={inviteEmail} onChange={e => setInviteEmail(e.target.value)} placeholder="member@example.com"
+              style={{ width:'100%', padding:'10px 14px', border:'1.5px solid #E2E8F0', borderRadius:10, fontSize:14, color:'#111827' }}/>
+          </div>
+          <div>
+            <label style={{ fontSize:13, fontWeight:600, color:'#374151', display:'block', marginBottom:6 }}>ロール</label>
+            <select value={inviteRole} onChange={e => setInviteRole(e.target.value as 'member' | 'admin')}
+              style={{ padding:'10px 14px', border:'1.5px solid #E2E8F0', borderRadius:10, fontSize:14, background:'#fff' }}>
+              <option value="member">メンバー</option>
+              <option value="admin">管理者</option>
+            </select>
+          </div>
+          <button onClick={createInvite} disabled={inviting}
+            style={{ padding:'10px 20px', borderRadius:10, border:'none', cursor:'pointer', background:'#6366F1', color:'#fff', fontSize:14, fontWeight:700, whiteSpace:'nowrap' }}>
+            {inviting ? '発行中...' : '招待を発行'}
+          </button>
+        </div>
+        {lastLink && (
+          <div style={{ marginTop:14, background:'#EEF2FF', border:'1px solid #C7D2FE', borderRadius:10, padding:'10px 14px', display:'flex', alignItems:'center', gap:10 }}>
+            <code style={{ flex:1, fontSize:12, color:'#4338CA', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{lastLink}</code>
+            <button onClick={() => copyLink(lastLink)} style={{ display:'flex', alignItems:'center', gap:4, background:'#fff', border:'1px solid #C7D2FE', borderRadius:8, padding:'6px 10px', cursor:'pointer', fontSize:12, fontWeight:600, color:'#4338CA' }}>
+              <Copy size={13}/> コピー
+            </button>
+          </div>
+        )}
+        {invites.filter(iv => !iv.used).length > 0 && (
+          <div style={{ marginTop:16, display:'flex', flexDirection:'column', gap:8 }}>
+            {invites.filter(iv => !iv.used).map(iv => (
+              <div key={iv.id} style={{ display:'flex', alignItems:'center', gap:12, padding:'10px 14px', background:'#F8FAFC', borderRadius:10, border:'1px solid #F1F5F9' }}>
+                <div style={{ flex:1, fontSize:13, color:'#1E293B' }}>{iv.email}</div>
+                <span style={{ fontSize:12, color:'#64748B' }}>{iv.role === 'admin' ? '管理者' : 'メンバー'}</span>
+                <button onClick={() => cancelInvite(iv.id)} style={{ background:'#FEE2E2', border:'none', cursor:'pointer', color:'#DC2626', padding:'5px 10px', borderRadius:8, fontSize:12, fontWeight:600 }}>取消</button>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* User Management */}

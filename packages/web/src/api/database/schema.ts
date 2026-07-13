@@ -1,4 +1,4 @@
-import { sqliteTable, text, integer, real } from "drizzle-orm/sqlite-core"
+import { sqliteTable, text, integer } from "drizzle-orm/sqlite-core"
 
 export const users = sqliteTable("users", {
   id: text("id").primaryKey(),
@@ -58,6 +58,7 @@ export const expenses = sqliteTable("expenses", {
   status: text("status", { enum: ["pending", "approved", "rejected"] }).notNull().default("pending"),
   note: text("note"),
   aiWarning: text("ai_warning"),
+  rejectionReason: text("rejection_reason"),
   receiptImageKey: text("receipt_image_key"),
   createdAt: integer("created_at", { mode: "timestamp" }).notNull().$defaultFn(() => new Date()),
 })
@@ -65,4 +66,15 @@ export const expenses = sqliteTable("expenses", {
 export const settings = sqliteTable("settings", {
   key: text("key").primaryKey(),
   value: text("value").notNull(),
+})
+
+export const invitations = sqliteTable("invitations", {
+  id: text("id").primaryKey(),
+  email: text("email").notNull(),
+  code: text("code").notNull().unique(),
+  role: text("role", { enum: ["member", "admin"] }).notNull().default("member"),
+  invitedBy: text("invited_by").references(() => users.id, { onDelete: "set null" }),
+  used: integer("used", { mode: "boolean" }).notNull().default(false),
+  expiresAt: integer("expires_at", { mode: "timestamp" }).notNull(),
+  createdAt: integer("created_at", { mode: "timestamp" }).notNull().$defaultFn(() => new Date()),
 })

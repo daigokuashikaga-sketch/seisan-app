@@ -6,3 +6,21 @@ dist/
 .github_token
 .bun/
 *.log
+uploads/
+
+# ローカル試用DB（libSQL ファイル）
+*.db
+*.db-shm
+*.db-wal
+*.sqlite
+
+# Electron ビルド成果物
+dist-electron/
+release/
+# desktop に同梱用としてコピーされる web ビルド/マイグレーション
+packages/desktop/web-dist/
+packages/desktop/drizzle/
+
+# プレゼン用のローカル成果物（コード対象外。ユーザーへ直接共有済み）
+.demo/
+*.pptx

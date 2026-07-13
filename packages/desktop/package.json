@@ -1,18 +1,41 @@
 {
   "name": "@template/desktop",
+  "productName": "Seisan",
   "private": true,
-  "version": "0.0.0",
+  "version": "0.3.0",
+  "description": "Seisan - 経費精算デスクトップアプリ（スタンドアロン）",
+  "author": "Seisan",
   "type": "module",
   "main": "dist-electron/main.js",
   "scripts": {
     "dev": "vite",
-    "build": "vite build",
-    "dist": "vite build && electron-builder",
+    "build:web": "cd ../web && bunx vite build",
+    "prepare:assets": "node scripts/prepare-assets.mjs",
+    "build": "bun run build:web && bun run prepare:assets && vite build",
+    "dist": "bun run build && electron-builder",
     "typecheck": "tsc --noEmit"
   },
+  "dependencies": {
+    "libsql": "^0.5.29",
+    "@neon-rs/load": "^0.0.4",
+    "detect-libc": "2.0.2"
+  },
+  "optionalDependencies": {
+    "@libsql/win32-x64-msvc": "^0.5.29",
+    "@libsql/linux-x64-gnu": "^0.5.29",
+    "@libsql/linux-x64-musl": "^0.5.29",
+    "@libsql/darwin-x64": "^0.5.29",
+    "@libsql/darwin-arm64": "^0.5.29"
+  },
   "devDependencies": {
+    "@hono/node-server": "^1.13.7",
+    "@libsql/client": "^0.17.2",
+    "@template/web": "workspace:*",
+    "@types/node": "^25.9.2",
+    "drizzle-orm": "^0.45.2",
     "electron": "^30.0.1",
     "electron-builder": "^24.13.3",
+    "hono": "^4.12.10",
     "typescript": "^5.2.2",
     "vite": "^5.1.6",
     "vite-plugin-electron": "^0.28.6",

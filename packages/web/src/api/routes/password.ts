@@ -7,8 +7,7 @@ import { sendPasswordResetEmail } from "../lib/mailer"
 
 // Better Auth互換のscryptハッシュ
 async function hashPasswordBetterAuth(password: string): Promise<string> {
-  const { scryptAsync } = await import("@noble/hashes/scrypt")
-  const { hex } = await import("@noble/hashes/utils")
+  const { scryptAsync } = await import("@noble/hashes/scrypt.js")
   const salt = Array.from(crypto.getRandomValues(new Uint8Array(16)))
     .map(b => b.toString(16).padStart(2, "0")).join("")
   const key = await scryptAsync(password.normalize("NFKC"), salt, {
