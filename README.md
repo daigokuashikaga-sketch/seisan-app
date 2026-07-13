@@ -93,6 +93,13 @@ bun run start   # ecosystem.config.cjs で起動
 
 `packages/desktop` は `.exe` を起動するだけで動くデスクトップアプリです。初回起動時に**利用方法を選択**できます（メニュー「動作モードを変更…」でいつでも切替可）。
 
+### ダウンロード（Windows・すぐ使う）
+
+ビルド不要。**[Releases](https://github.com/daigokuashikaga-sketch/seisan-app/releases/latest) から `Seisan-Windows-*-Setup.exe` をダウンロード**して実行するだけです（ログイン不要・誰でも取得可）。
+
+- 最新版: **v0.3.0** — [ダウンロードページ](https://github.com/daigokuashikaga-sketch/seisan-app/releases/tag/desktop-v0.3.0) ／ [インストーラ直リンク](https://github.com/daigokuashikaga-sketch/seisan-app/releases/download/desktop-v0.3.0/Seisan-Windows-0.3.0-Setup.exe)
+- ⚠️ 未署名アプリのため、初回起動時に「**WindowsによってPCが保護されました**」の青い警告が出たら **「詳細情報」→「実行」** で起動できます（動作に問題はありません）。
+
 | モード | データの保存先 | 用途 |
 |---|---|---|
 | 💻 **オフライン**（この PC だけで使う）| PC 内のローカル SQLite（`userData/seisan.db`）| 個人・1台運用。サーバー不要・ネット不要 |
@@ -182,6 +189,6 @@ packages/desktop/        Electron（オフライン=埋め込みサーバー / �
     main.ts              ウィンドウ/ライフサイクル/モード選択/サーバー起動
     server/start-server  Hono API + 静的配信 + マイグレーションの埋め込み起動
     server/backup.ts     DB整合スナップショット(VACUUM INTO) + 領収書のバックアップ
-    preload.ts           contextBridge（モード設定/バックアップ/dialog/fs/notification/window）
+    preload.ts           contextBridge（モード設定/バックアップ/dialog/notification/window）
 packages/mobile/         Expo アプリ
 ```
